@@ -11,7 +11,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 
 ## Installation
 1. Make sure the correct version of C++ compiler has been installed.
-2. _**By default**_, _**use**_ `make` _**to generate everything.**_
+2. _**By default**_, _**use**_ `make` _**to generate everything (DSBMain, DataGeneration).**_
 3. There are two binary executables you could generate.
     * To generate **DSBMain** (for DSB), please `make main`.
     * To generate **DataGeneration** (for generating simulation data), please `make gen`.
