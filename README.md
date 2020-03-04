@@ -18,7 +18,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 4. To remove installation, please `make clean`. This will remove everything generated after your initial download, except data files you generated using **DataGeneration**.
 
 ## How To Run
-1. **DSBMain**
+#### **DSBMain**
 ```bash
 ./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] -vh
 
@@ -40,7 +40,7 @@ We have data files **data/sample_X.txt** and **data/sample_Y.txt**. We assume th
 ./DSBMain -x data/sample_X.txt -y data/sample_Y.txt -i 0.05 -d 0.05 -m 0.05 -a 1000 -k 1000000
 ```
 
-2. **DataGeneration**
+#### **DataGeneration**
 ```bash
 ./DataGeneration -i [insertion rate] -d [deletion rate] -m [mutation rate] -n [number of sequences] -s [initial length of a sequence] -p [path] -vh
 
