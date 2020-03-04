@@ -33,9 +33,13 @@ format: DSBMain.cpp DataGeneration.cpp
 
 clean:
 	rm -f DSBMain
-	rm -rf DSBMain.dSYM
+	if [ -d DSBMain.dSYM ]; then
+		rm -rf DSBMain.dSYM
+	fi
 	rm -f DataGeneration
-	rm -rf DataGeneration.dSYM
+	if [ -d DataGeneration.dSYM ]; then
+		rm -rf DataGeneration.dSYM
+	fi
 
 current:
 	echo "Current compiling command is '$(COMPILE_CMD)'"
