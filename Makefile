@@ -16,30 +16,26 @@ COMPILE_SERVER=$(CCSERVER) $(CXXFLAGS) $(OPTIMIZE) $(LDFLAGS)
 default: main gen 
 
 server: COMPILE_CMD=$(COMPILE_SERVER)
-server: main
+server: main gen
 
 main: DSBMain.cpp
-	echo "Compiling data-dependent method with post-processing..."
-	$(COMPILE_CMD) DSBMain.cpp -o DSBMain
-	echo "Done."
+		echo "Compiling data-dependent method with post-processing..."
+		$(COMPILE_CMD) DSBMain.cpp -o DSBMain
+		echo "Done."
 
 gen: DataGeneration.cpp
-	echo "Compiling simulation data generation..."
-	$(COMPILE_CMD) DataGeneration.cpp -o DataGeneration
-	echo "Done."
+		echo "Compiling simulation data generation..."
+		$(COMPILE_CMD) DataGeneration.cpp -o DataGeneration
+		echo "Done."
 
 format: DSBMain.cpp DataGeneration.cpp
-	clang-format -style=file -i DSBMain.cpp DataGeneration.cpp
+		clang-format -style=file -i DSBMain.cpp DataGeneration.cpp
 
 clean:
-	rm -f DSBMain
-	if [ -d DSBMain.dSYM ]; then
-		rm -rf DSBMain.dSYM
-	fi
-	rm -f DataGeneration
-	if [ -d DataGeneration.dSYM ]; then
-		rm -rf DataGeneration.dSYM
-	fi
+		if [ -f DSBMain ]; then echo -e "removing DSBMain"; rm -f DSBMain; fi
+		if [ -d DSBMain.dSYM ]; then rm -rf DSBMain.dSYM; fi
+		if [ -f DataGeneration ]; then echo -e "removing DataGeneration"; rm -f DataGeneration; fi
+		if [ -d DataGeneration.dSYM ]; then rm -rf DataGeneration.dSYM; fi
 
 current:
-	echo "Current compiling command is '$(COMPILE_CMD)'"
+		echo "Current compiling command is '$(COMPILE_CMD)'"
