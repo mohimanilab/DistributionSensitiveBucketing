@@ -173,6 +173,14 @@ ostream &operator<<(ostream &os, const pair<int, int> &pairs) {
     os << pairs.first << "," << pairs.second;
     return os;
 }
+
+ostream &operator<<(ostream &os, const set<pair<int,int>> &aset) {
+    for (auto it = aset.begin(); it != aset.end(); ++it) {
+        os << *it << ";";
+    }
+    return os;
+}
+
 /*************** End of operator overloading ***************/
 
 /***************** functions/variables ********************/
@@ -246,6 +254,63 @@ void readData(string xfile, string yfile) {
         exit(1);
     }
     data_y.close();
+}
+
+// alignment method for comparing two given data points
+int alignment(vector<char> & x, vector<char> & y, int xstart, int ystart, int range) {
+    // rows are x, columns are y
+    int xend = 0;
+    int yend = 0;
+    if (range != -1) {
+        xend = min(xstart + range + 1, int(x.size()+1));
+        yend = min(ystart + range + 1, int(y.size()+1));
+    }
+    else {
+        xend = x.size() + 1;
+        yend = y.size() + 1;
+    }
+    vector<vector <int> > matrix(xend - xstart, vector<int>(yend - ystart, 0));
+    
+    // initialize first column/row
+    for (int i = 1; i < xend - xstart; i++) {
+        matrix[i][0] = matrix[i-1][0] - 1;
+    }
+    for (int j = 1; j < yend - ystart; j++) {
+        matrix[0][j] = matrix[0][j-1] - 1;
+    }
+
+    // run alignment
+    for (int i = 1; i < xend - xstart; i++) {
+        for (int j = 1; j < yend - ystart; j++) {
+            // diagonal
+            int diag = matrix[i-1][j-1];
+            if (x[i-1 + xstart] == y[j-1 + ystart])
+                diag += s_match;
+            else
+                diag += s_mismatch;
+            
+            // indels
+            int from_left = matrix[i][j-1] + s_indel;
+            int from_top = matrix[i-1][j] + s_indel;
+
+            // check which one is the largest
+            if (diag > from_left && diag > from_top)
+                matrix[i][j] = diag;
+            else if (from_left > diag && from_left > from_top)
+                matrix[i][j] = from_left;
+            else if (from_top > diag && from_top > from_left)
+                matrix[i][j] = from_top;
+            else {
+                if (diag == from_left)
+                    matrix[i][j] = diag;
+                else if (diag == from_top)
+                    matrix[i][j] = diag;
+                else
+                    matrix[i][j] = from_top;
+            }
+        }
+    }
+    return matrix[xend-xstart-1][yend-ystart-1];
 }
 
 // function to print needed arguments/documentation for this program
@@ -592,6 +657,8 @@ int main(int argc, char **argv) {
     string xfile = "";
     string yfile = "";
     double add_threshold, kill_threshold;
+    double align_multi = 0.4;
+    int range = 50;
     int verbose = 0;
 
     // argument parsing
@@ -665,8 +732,10 @@ int main(int argc, char **argv) {
     // pre-allocate two tree structures for X and Y, nodes are kmers which
     // contain the strings that have the kmers
     // run for each b, sum all up
-    unordered_map<int, bool> matches;
-    map<pair<int, int>, long> mismatches;
+    //unordered_map<int, bool> matches;
+    //map<pair<int, int>, long> mismatches;
+    map< pair<int, int>, set<pair<int, int>> > results;
+    ofstream reports;
     int t0           = 0;
     int t1           = 0;
     int t2           = 0;
@@ -689,7 +758,7 @@ int main(int argc, char **argv) {
     make_kmer_tree(X, 0, 0, Xmer_tree);
     make_kmer_tree(Y, 0, 0, Ymer_tree);
     cend = Clock::now();
-    t0 += chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
+    t0 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
     cerr << t0 << " ms" << endl;
 
     // (2) start constructing decision tree
@@ -708,6 +777,7 @@ int main(int argc, char **argv) {
     total_q     = get<5>(tmp);
 
     // (3) collect results from all buckets
+    int align_thres = int(align_multi * range);
     cerr << "Collecting results (bucket size: " << buckets.size() << ")... ";
     cstart = Clock::now();
     for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
@@ -715,10 +785,34 @@ int main(int argc, char **argv) {
              xit != it->second->hashX->hashed.cend(); ++xit) {
             for (auto yit = it->second->hashY->hashed.cbegin();
                  yit != it->second->hashY->hashed.cend(); ++yit) {
+                // if mapping within the same file, ignore self mapping
                 if (xfile == yfile && xit->first == yit->first)
                     continue;
-                cout << xit->first << ":" << xit->second << ";" << yit->first
-                     << ":" << yit->second << endl;
+                // check alignment score (post-processing)
+                int align_score = 0;
+                int aligned_i, aligned_j;
+                for (int i = 0; i < xit->second.size(); i++) {
+                    for (int j = 0; j < yit->second.size(); j++) {
+                        align_score = max(align_score, alignment(X[xit->first],
+                                    Y[yit->first], xit->second[i], yit->second[j],
+                                    range));
+                        if (align_score >= align_thres) {
+                            aligned_i = i;
+                            aligned_j = j;
+                            goto endloop;
+                        }
+                    }
+                }
+endloop:
+                if (align_score >= align_thres) {
+                    pair<int, int> key, val;
+                    key = make_pair(xit->first, yit->first);
+                    val = make_pair(xit->second[aligned_i], yit->second[aligned_j]);
+                    results[key].insert(val);
+                }
+
+                //reports << xit->first << ":" << xit->second << ";"
+                //    << yit->first << ":" << yit->second << endl;
             }
         }
         xmer += (it->first.first).size();
@@ -730,14 +824,27 @@ int main(int argc, char **argv) {
     xmer /= buckets.size();
     ymer /= buckets.size();
 
+    // (4) writing to local files
+    cerr << "Writing results ... ";
+    cstart = Clock::now();
+    reports.open("output.txt", ofstream::out);
+    for (auto it = results.cbegin(); it != results.cend(); ++it) {
+        reports << it->first << ":" << it->second << endl;
+    }
+    cend = Clock::now();
+    t3   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
+    cerr << t3 << " ms" << endl;
+
     /* LOCAL ALIGNMENT END */
 
     int overall = t0 + t1 + t2 + t3;
 
     // all outputs
-    cout << add_threshold << "," << kill_threshold << "," << overall << ","
-         << t0 << "," << t1 << "," << t2 << "," << total_p << "," << total_px
-         << "," << total_py << "," << total_q << "," << num_bucket << ","
-         << total_nodes << "," << xmer << "," << ymer << "\n";
+    reports << add_threshold << "," << kill_threshold << "," << overall << ","
+         << t0 << "," << t1 << "," << t2 << "," << t3 <<  "," << total_p << ","
+         << total_px << "," << total_py << "," << total_q << ","
+         << num_bucket << "," << total_nodes << "," << xmer << ","
+         << ymer << endl;
+    reports.close();
     return 0;
 }
