@@ -11,7 +11,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 
 ## Installation
 1. Make sure the correct version of C++ compiler has been installed.
-2. By default, use `make` to generate everything.
+2. _**By default**_, _**use**_ `make` _**to generate everything (DSBMain, DataGeneration).**_
 3. There are two binary executables you could generate.
     * To generate **DSBMain** (for DSB), please `make main`.
     * To generate **DataGeneration** (for generating simulation data), please `make gen`.
@@ -34,7 +34,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 ```
 To view the full helper message with command line, please use `./DSBMain -h`.
 
-##### Example 1
+##### _Example 1_
 We have data files **data/sample_X.txt** and **data/sample_Y.txt**. We assume that these files represent DNA sequencing data with **5\% insertion rate, 5\% deletion rate, and 5\% mutation rate**. We want our data structure to have **threshold 1=1000** and **threshold 2=1000000**. Then, we need to run the program with the following command:
 ```bash
 ./DSBMain -x data/sample_X.txt -y data/sample_Y.txt -i 0.05 -d 0.05 -m 0.05 -a 1000 -k 1000000
@@ -55,7 +55,7 @@ We have data files **data/sample_X.txt** and **data/sample_Y.txt**. We assume th
 ```
 To view the full helper message with command line, please use `./DataGeneration -h`.
 
-##### Example 2
+##### _Example 2_
 We want to generate data files under the **data/** directory. We want the **insertion rate, deletion rate, and mutation rate all to be 5\%**. We want to generate **1000 sequence pairs** (each sequence pair contains two sequences: one for X and one for Y. They are generated with the intended insertion/deletion/mutation rates), each to be approximately **100 bp in length**. Then, we need to run the program with the following command:
 ```bash
 ./DataGeneration -i 0.05 -d 0.05 -m 0.05 -n 1000 -s 100 -p data
