@@ -174,7 +174,7 @@ ostream &operator<<(ostream &os, const pair<int, int> &pairs) {
     return os;
 }
 
-ostream &operator<<(ostream &os, const set<pair<int,int>> &aset) {
+ostream &operator<<(ostream &os, const set<pair<int, int>> &aset) {
     for (auto it = aset.begin(); it != aset.end(); ++it) {
         os << *it << ";";
     }
@@ -257,41 +257,41 @@ void readData(string xfile, string yfile) {
 }
 
 // alignment method for comparing two given data points
-int alignment(vector<char> & x, vector<char> & y, int xstart, int ystart, int range) {
+int alignment(vector<char> &x, vector<char> &y, int xstart, int ystart,
+              int range) {
     // rows are x, columns are y
     int xend = 0;
     int yend = 0;
     if (range != -1) {
-        xend = min(xstart + range + 1, int(x.size()+1));
-        yend = min(ystart + range + 1, int(y.size()+1));
-    }
-    else {
+        xend = min(xstart + range + 1, int(x.size() + 1));
+        yend = min(ystart + range + 1, int(y.size() + 1));
+    } else {
         xend = x.size() + 1;
         yend = y.size() + 1;
     }
-    vector<vector <int> > matrix(xend - xstart, vector<int>(yend - ystart, 0));
-    
+    vector<vector<int>> matrix(xend - xstart, vector<int>(yend - ystart, 0));
+
     // initialize first column/row
     for (int i = 1; i < xend - xstart; i++) {
-        matrix[i][0] = matrix[i-1][0] - 1;
+        matrix[i][0] = matrix[i - 1][0] - 1;
     }
     for (int j = 1; j < yend - ystart; j++) {
-        matrix[0][j] = matrix[0][j-1] - 1;
+        matrix[0][j] = matrix[0][j - 1] - 1;
     }
 
     // run alignment
     for (int i = 1; i < xend - xstart; i++) {
         for (int j = 1; j < yend - ystart; j++) {
             // diagonal
-            int diag = matrix[i-1][j-1];
-            if (x[i-1 + xstart] == y[j-1 + ystart])
+            int diag = matrix[i - 1][j - 1];
+            if (x[i - 1 + xstart] == y[j - 1 + ystart])
                 diag += s_match;
             else
                 diag += s_mismatch;
-            
+
             // indels
-            int from_left = matrix[i][j-1] + s_indel;
-            int from_top = matrix[i-1][j] + s_indel;
+            int from_left = matrix[i][j - 1] + s_indel;
+            int from_top  = matrix[i - 1][j] + s_indel;
 
             // check which one is the largest
             if (diag > from_left && diag > from_top)
@@ -310,7 +310,7 @@ int alignment(vector<char> & x, vector<char> & y, int xstart, int ystart, int ra
             }
         }
     }
-    return matrix[xend-xstart-1][yend-ystart-1];
+    return matrix[xend - xstart - 1][yend - ystart - 1];
 }
 
 // function to print needed arguments/documentation for this program
@@ -657,9 +657,9 @@ int main(int argc, char **argv) {
     string xfile = "";
     string yfile = "";
     double add_threshold, kill_threshold;
-    double align_multi = 0.4;
-    int range = 50;
-    int verbose = 0;
+    double align_multi = 0.35;
+    int range          = 20;
+    int verbose        = 0;
 
     // argument parsing
     int error_flag = !(argc == 15 || argc == 16 || argc == 17);
@@ -732,9 +732,10 @@ int main(int argc, char **argv) {
     // pre-allocate two tree structures for X and Y, nodes are kmers which
     // contain the strings that have the kmers
     // run for each b, sum all up
-    //unordered_map<int, bool> matches;
-    //map<pair<int, int>, long> mismatches;
-    map< pair<int, int>, set<pair<int, int>> > results;
+    // unordered_map<int, bool> matches;
+    // map<pair<int, int>, long> mismatches;
+    map<pair<int, int>, set<pair<int, int>>> results;
+    map<pair<int, int>, pair<int, int>> cur_mapped_low;
     ofstream reports;
     int t0           = 0;
     int t1           = 0;
@@ -758,7 +759,7 @@ int main(int argc, char **argv) {
     make_kmer_tree(X, 0, 0, Xmer_tree);
     make_kmer_tree(Y, 0, 0, Ymer_tree);
     cend = Clock::now();
-    t0 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
+    t0   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
     cerr << t0 << " ms" << endl;
 
     // (2) start constructing decision tree
@@ -793,9 +794,30 @@ int main(int argc, char **argv) {
                 int aligned_i, aligned_j;
                 for (int i = 0; i < xit->second.size(); i++) {
                     for (int j = 0; j < yit->second.size(); j++) {
-                        align_score = max(align_score, alignment(X[xit->first],
-                                    Y[yit->first], xit->second[i], yit->second[j],
-                                    range));
+                        // if the current map point of (x,y) has been covered
+                        // by previous alignment, then skip
+                        pair<int, int> cur_xy =
+                            make_pair(xit->first, yit->first);
+                        // if the pair is checked already (exists in the
+                        // result), then skip
+                        // if (results.find(cur_xy) != results.end()) {
+                        //    goto endloop;
+                        //}
+                        if (((cur_mapped_low[cur_xy].first + range) >=
+                                 xit->second[i] &&
+                             cur_mapped_low[cur_xy].first < xit->second[i]) ||
+                            ((cur_mapped_low[cur_xy].second + range) >=
+                                 yit->second[j] &&
+                             cur_mapped_low[cur_xy].second < yit->second[j])) {
+                            continue;
+                        }
+
+                        align_score = max(
+                            align_score,
+                            alignment(X[xit->first], Y[yit->first],
+                                      xit->second[i], yit->second[j], range));
+
+                        // if alignment score is good, then end the loop
                         if (align_score >= align_thres) {
                             aligned_i = i;
                             aligned_j = j;
@@ -803,15 +825,22 @@ int main(int argc, char **argv) {
                         }
                     }
                 }
-endloop:
+            endloop:
                 if (align_score >= align_thres) {
                     pair<int, int> key, val;
                     key = make_pair(xit->first, yit->first);
-                    val = make_pair(xit->second[aligned_i], yit->second[aligned_j]);
+                    val = make_pair(xit->second[aligned_i],
+                                    yit->second[aligned_j]);
                     results[key].insert(val);
+
+                    // update low end of the cur_mapped_low
+                    pair<int, int> cur_low = cur_mapped_low[key];
+                    cur_mapped_low[key] =
+                        make_pair(max(cur_low.first, xit->second[aligned_i]),
+                                  max(cur_low.second, yit->second[aligned_j]));
                 }
 
-                //reports << xit->first << ":" << xit->second << ";"
+                // reports << xit->first << ":" << xit->second << ";"
                 //    << yit->first << ":" << yit->second << endl;
             }
         }
@@ -829,7 +858,9 @@ endloop:
     cstart = Clock::now();
     reports.open("output.txt", ofstream::out);
     for (auto it = results.cbegin(); it != results.cend(); ++it) {
-        reports << it->first << ":" << it->second << endl;
+        reports << it->first << ":" << *(it->second.begin()) << " -> "
+                << (it->second.rbegin())->first + range / 2 << ","
+                << (it->second.rbegin())->second + range / 2 << endl;
     }
     cend = Clock::now();
     t3   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
@@ -841,10 +872,10 @@ endloop:
 
     // all outputs
     reports << add_threshold << "," << kill_threshold << "," << overall << ","
-         << t0 << "," << t1 << "," << t2 << "," << t3 <<  "," << total_p << ","
-         << total_px << "," << total_py << "," << total_q << ","
-         << num_bucket << "," << total_nodes << "," << xmer << ","
-         << ymer << endl;
+            << t0 << "," << t1 << "," << t2 << "," << t3 << "," << total_p
+            << "," << total_px << "," << total_py << "," << total_q << ","
+            << num_bucket << "," << total_nodes << "," << xmer << "," << ymer
+            << endl;
     reports.close();
     return 0;
 }

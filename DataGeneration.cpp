@@ -37,7 +37,7 @@ ostream &operator<<(ostream &os, const vector<char> &seq) {
 void print_helper() {
     printf("Usage: ./DataGeneration -i [insertion rate] -d [deletion rate] -m "
            "[mutation rate] -n [number of sequences] -s [initial length of a "
-           "sequence] {-p [path]} {-vh}\n\n");
+           "sequence] {-f [num]} {-p [path]} {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
     printf("-v\t\tVerbose mode.\n");
     printf("-i [0<=i<1]\tInsertion rate.\n");
@@ -46,6 +46,8 @@ void print_helper() {
            "happens.\n");
     printf("-n [n>0]\tNumber of sequence pairs to generate.\n");
     printf("-s [s>0]\tInitial length of a sequence pair.\n");
+    printf("-f [num]\tPrecision for rates that will appear on the output file. "
+           "Default: 2\n");
     printf("-p [path]\tWhere generated data will be written to. Default: "
            "data/\n\n");
 }
@@ -139,7 +141,8 @@ void gen_data(double insertion, double deletion, double mutation, int num,
 
 // function to write to local
 void write_to(vector<vector<char>> &data, double insertion, double deletion,
-              int num_of_seq, int len_of_seq, int which, string path) {
+              int num_of_seq, int len_of_seq, int which, string path,
+              int precision) {
     ofstream file;
     ofstream file2;
     string filename;
@@ -151,22 +154,22 @@ void write_to(vector<vector<char>> &data, double insertion, double deletion,
     if (which == 0) {
         cerr << "Writing X data files... ";
         oss << path << "s_" << to_string(num_of_seq) << "_"
-            << to_string(len_of_seq) << "_" << fixed << setprecision(2)
-            << insertion << "_" << fixed << setprecision(2) << deletion
+            << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
+            << insertion << "_" << fixed << setprecision(precision) << deletion
             << ".fasta";
         oss2 << path << "X" << to_string(num_of_seq) << "_"
-             << to_string(len_of_seq) << "_" << fixed << setprecision(2)
-             << insertion << "_" << fixed << setprecision(2) << deletion
+             << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
+             << insertion << "_" << fixed << setprecision(precision) << deletion
              << ".txt";
     } else {
         cerr << "Writing Y data files... ";
         oss << path << "q_" << to_string(num_of_seq) << "_"
-            << to_string(len_of_seq) << "_" << fixed << setprecision(2)
-            << insertion << "_" << fixed << setprecision(2) << deletion
+            << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
+            << insertion << "_" << fixed << setprecision(precision) << deletion
             << ".fasta";
         oss2 << path << "Y" << to_string(num_of_seq) << "_"
-             << to_string(len_of_seq) << "_" << fixed << setprecision(2)
-             << insertion << "_" << fixed << setprecision(2) << deletion
+             << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
+             << insertion << "_" << fixed << setprecision(precision) << deletion
              << ".txt";
     }
     filename  = oss.str();
@@ -196,9 +199,10 @@ int main(int argc, char **argv) {
 
     char opt;
     int verbose    = 0;
-    int error_flag = !(argc >= 11 && argc <= 15);
+    int precision  = 2;
+    int error_flag = !(argc >= 11 && argc <= 17);
 
-    while ((opt = getopt(argc, argv, "vhi:d:m:s:n:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "vhi:d:m:s:n:p:f:")) != -1) {
         switch (opt) {
         case 'h': // print helper text
             print_helper();
@@ -225,6 +229,10 @@ int main(int argc, char **argv) {
             path = optarg;
             path = path + "/";
             break;
+        case 'f': // precision (num of digits after decimal) for the rates
+                  // that will appear on output files
+            precision = atoi(optarg);
+            break;
         default:
             error_flag = 1;
             break;
@@ -239,7 +247,7 @@ int main(int argc, char **argv) {
 
     if (verbose) {
         printf("Number of sequences: %d\tSequence length: %d\nInsertion: "
-               "%.3f\tDeletion: %.3f\t\tMutation: %.3f\n\n",
+               "%.4f\tDeletion: %.4f\t\tMutation: %.4f\n\n",
                num_of_seq, len_of_seq, insertion, deletion, mutation);
     }
 
@@ -254,7 +262,9 @@ int main(int argc, char **argv) {
     cerr << t0 << " ms" << endl;
 
     // write generated sequence pairs to the designated directory
-    write_to(X, insertion, deletion, num_of_seq, len_of_seq, 0, path);
-    write_to(Y, insertion, deletion, num_of_seq, len_of_seq, 1, path);
+    write_to(X, insertion, deletion, num_of_seq, len_of_seq, 0, path,
+             precision);
+    write_to(Y, insertion, deletion, num_of_seq, len_of_seq, 1, path,
+             precision);
     return 0;
 }
