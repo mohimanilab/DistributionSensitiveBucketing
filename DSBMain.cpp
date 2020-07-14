@@ -181,6 +181,13 @@ ostream &operator<<(ostream &os, const set<pair<int, int>> &aset) {
     return os;
 }
 
+ostream &operator<<(ostream &os, const vector<pair<int, int>> &avec) {
+    for (auto it = avec.begin(); it != avec.end(); ++it) {
+        os << *it << ";";
+    }
+    return os;
+}
+
 /*************** End of operator overloading ***************/
 
 /***************** functions/variables ********************/
@@ -423,7 +430,8 @@ void make_kmer_tree(vector<vector<char>> &target, int ind, int b,
 }
 
 // function to visit the kmernode and make its children
-void visit(map<vector<char>, kmernode *> &prefix_tree, kmernode *cur) {
+void visit(map<vector<char>, kmernode *> &prefix_tree, kmernode *cur,
+           int branch) {
     cur->visited = 1;
 
     // 4 possible children
@@ -436,12 +444,25 @@ void visit(map<vector<char>, kmernode *> &prefix_tree, kmernode *cur) {
 
         for (auto it = cur->hashed.cbegin(); it != cur->hashed.cend(); ++it) {
             for (int m = 0; m < it->second.size(); m++) {
-                if (it->second[m] >= X[it->first].size())
-                    continue;
+                // prefix tree for X
+                if (branch == 0) {
+                    if (it->second[m] >= X[it->first].size())
+                        continue;
 
-                if (X[it->first][it->second[m]] == next_kmer.back()) {
-                    next_kmernode->hashed[it->first].push_back(it->second[m] +
-                                                               1);
+                    if (X[it->first][it->second[m]] == next_kmer.back()) {
+                        next_kmernode->hashed[it->first].push_back(
+                            it->second[m] + 1);
+                    }
+                }
+                // prefix tree for Y
+                else {
+                    if (it->second[m] >= Y[it->first].size())
+                        continue;
+
+                    if (Y[it->first][it->second[m]] == next_kmer.back()) {
+                        next_kmernode->hashed[it->first].push_back(
+                            it->second[m] + 1);
+                    }
                 }
             }
         }
@@ -516,10 +537,10 @@ indpt_tree(double kill_threshold, double add_threshold,
         // create their children if the prefix exists and not already visited
         // cerr << "reached here" << endl;
         if (working->hashX->size() > 0 && !(working->hashX->visited)) {
-            visit(Xmer_tree, working->hashX);
+            visit(Xmer_tree, working->hashX, 0);
         }
         if (working->hashY->size() > 0 && !(working->hashY->visited)) {
-            visit(Ymer_tree, working->hashY);
+            visit(Ymer_tree, working->hashY, 1);
         }
 
         vector<char> prev_x = working->x;
@@ -658,7 +679,7 @@ int main(int argc, char **argv) {
     string yfile = "";
     double add_threshold, kill_threshold;
     double align_multi = 0.35;
-    int range          = 20;
+    int range          = 12;
     int verbose        = 0;
 
     // argument parsing
@@ -858,9 +879,10 @@ int main(int argc, char **argv) {
     cstart = Clock::now();
     reports.open("output.txt", ofstream::out);
     for (auto it = results.cbegin(); it != results.cend(); ++it) {
-        reports << it->first << ":" << *(it->second.begin()) << " -> "
-                << (it->second.rbegin())->first + range / 2 << ","
-                << (it->second.rbegin())->second + range / 2 << endl;
+        // reports << it->first << ":" << *(it->second.begin()) << " -> "
+        //        << (it->second.rbegin())->first + range / 2 << ","
+        //        << (it->second.rbegin())->second + range / 2 << endl;
+        reports << it->first << ":" << it->second << endl;
     }
     cend = Clock::now();
     t3   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
