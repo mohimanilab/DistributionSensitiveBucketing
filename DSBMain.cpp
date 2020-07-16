@@ -225,41 +225,60 @@ void readData(string xfile, string yfile) {
     data_x.open(xfile);
     ifstream data_y;
     data_y.open(yfile);
+    vector<char> fx;
+    vector<char> fy;
 
     if (data_x.is_open()) {
         while (getline(data_x, line)) {
             stringstream ss(line);
             char i;
-            vector<char> fx;
             while (ss >> i) {
+                if (i == '>') {
+                    // if fx size is not 0, write fx to X
+                    if (fx.size() > 0)
+                        X.push_back(fx);
+                    fx.clear();
+                    goto skipline_x;
+                }
                 if (ss.peek() == ',' || ss.peek() == ' ' || ss.peek() == '\n')
                     ss.ignore();
                 fx.push_back(i);
             }
-            X.push_back(fx);
+skipline_x:
+            continue;
         }
     } else {
         cout << "X file not found in " << xfile << endl;
         exit(1);
     }
+    if (fx.size() > 0)
+        X.push_back(fx);
     data_x.close();
 
     if (data_y.is_open()) {
         while (getline(data_y, line)) {
             stringstream ss(line);
             char i;
-            vector<char> fy;
             while (ss >> i) {
+                if (i == '>') {
+                    if (fy.size() > 0)
+                        Y.push_back(fy);
+                    fy.clear();
+                    goto skipline_y;
+                }
                 if (ss.peek() == ',' || ss.peek() == ' ' || ss.peek() == '\n')
                     ss.ignore();
                 fy.push_back(i);
             }
-            Y.push_back(fy);
+skipline_y:
+            continue;
         }
     } else {
         cout << "Y file not found in " << yfile << endl;
         exit(1);
     }
+    if (fy.size() > 0)
+        Y.push_back(fy);
     data_y.close();
 }
 
