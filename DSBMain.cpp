@@ -244,7 +244,7 @@ void readData(string xfile, string yfile) {
                     ss.ignore();
                 fx.push_back(i);
             }
-skipline_x:
+        skipline_x:
             continue;
         }
     } else {
@@ -270,7 +270,7 @@ skipline_x:
                     ss.ignore();
                 fy.push_back(i);
             }
-skipline_y:
+        skipline_y:
             continue;
         }
     } else {
@@ -344,7 +344,7 @@ void print_helper() {
     printf(
         "Usage: ./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d "
         "[deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] "
-        "{-vh}\n\n");
+        "-o [name] {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
     printf("-v\t\tVerbose mode.\n");
     printf("-x [path/to/x]\tPath to X data file.\n");
@@ -354,7 +354,8 @@ void print_helper() {
     printf("-m [0<=e<0.5]\tMutation rate when neither insertion/deletion "
            "happens.\n");
     printf("-a [a>0]\tThreshold for a node to be considered a bucket.\n");
-    printf("-k [k>0]\tThreshold for a node to be pruned.\n\n");
+    printf("-k [k>0]\tThreshold for a node to be pruned.\n");
+    printf("-o [name]\tSpecify output file name.\n\n");
 }
 
 // function to get total fp
@@ -694,8 +695,9 @@ indpt_tree(double kill_threshold, double add_threshold,
 /***************** End of functions/variables ********************/
 
 int main(int argc, char **argv) {
-    string xfile = "";
-    string yfile = "";
+    string xfile       = "";
+    string yfile       = "";
+    string output_name = "output.txt";
     double add_threshold, kill_threshold;
     double align_multi = 0.35;
     int range          = 12;
@@ -704,7 +706,7 @@ int main(int argc, char **argv) {
     // argument parsing
     int error_flag = !(argc == 15 || argc == 16 || argc == 17);
     char opt;
-    while ((opt = getopt(argc, argv, "hvx:y:i:d:m:a:k:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvx:y:i:d:m:a:k:o:")) != -1) {
         switch (opt) {
         case 'x': // X datafile address
             xfile = optarg;
@@ -730,6 +732,9 @@ int main(int argc, char **argv) {
             break;
         case 'v': // verbose mode
             verbose = 1;
+            break;
+        case 'o': // specify output file name
+            output_name = optarg;
             break;
         case 'h': // print all needed arguments
             print_helper();
@@ -896,7 +901,7 @@ int main(int argc, char **argv) {
     // (4) writing to local files
     cerr << "Writing results ... ";
     cstart = Clock::now();
-    reports.open("output.txt", ofstream::out);
+    reports.open(output_name, ofstream::out);
     for (auto it = results.cbegin(); it != results.cend(); ++it) {
         // reports << it->first << ":" << *(it->second.begin()) << " -> "
         //        << (it->second.rbegin())->first + range / 2 << ","
