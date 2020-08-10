@@ -1,10 +1,10 @@
 # Distribution Sensitive Bucketing (DSB)
-Author(s): Chengze Shen, Mihir Mongia, Arash Gholami Davoodi, Hosein Mohimani
+Author(s): Chengze Shen, Mihir Mongia, Arash Gholami Davoodi, Guillaume Marcais, Hosein Mohimani
 
 ## What It Does
-DSB is a C++ based program to find overlaps among sequences. There are two input files: _X_ and _Y_ data. In each file, a line represents a sequence of alphabets (e.g. {A,T,C,G} for DNA sequences). The program will output, for every sequence in _Y_, the sequences in _X_ that overlaps with it. In case of a single file (_X_=_Y_), the program will avoid outputting self overlaps.
+DSB is a C++ based program to find overlaps among sequences and alignments of queries in a given genome. There are two input files: _X_ and _Y_ data in _.fasta_ format. The program will output, for every sequence in _Y_, the sequences in _X_ that overlaps with it. In case of a single file (_X_=_Y_), the program will avoid outputting self overlaps.
 
-The goal is to find as many as true overlapping sequences while minimizing false ones.
+The goal is to find as many as true overlapping sequences and alignments while minimizing false positives.
 
 ## Requirements
 The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11**. It was mainly tested on a MacBook Pro with **Apple LLVM 10.0.1**.
@@ -20,7 +20,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 ## How To Run
 #### **DSBMain**
 ```bash
-./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] -vh
+./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] -o [name] {-vh}
 
 -h              Print this block of information.
 -v              Verbose mode.
@@ -31,6 +31,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 -m [0<=e<0.5]   Mutation rate when neither insertion/deletion happens.
 -a [a>0]        Threshold for a node to be considered a bucket.
 -k [k>0]        Threshold for a node to be pruned.
+-o [name]       Specify output file name.
 ```
 To view the full helper message with command line, please use `./DSBMain -h`.
 
