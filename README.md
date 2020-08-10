@@ -41,6 +41,7 @@ We have data files **data/sample_X.txt** and **data/sample_Y.txt**. We assume th
 ./DSBMain -x data/sample_X.txt -y data/sample_Y.txt -i 0.05 -d 0.05 -m 0.05 -a 1000 -k 1000000
 ```
 
+Without specifying the output name, the program will print the results to a default file named **output.txt**.
 #### **DataGeneration**
 ```bash
 ./DataGeneration -i [insertion rate] -d [deletion rate] -m [mutation rate] -n [number of sequences] -s [initial length of a sequence] -p [path] -vh
@@ -67,4 +68,4 @@ The command will generate 4 files under **data/** directory, namely:
 * s_1000_100_0.05_0.05.fasta
 * q_1000_100_0.05_0.05.fasta
 
-The first two files could be inputs to **DSBMain** while the last two are the data in .fasta format.
+The first two files are simply sequences extracted from _.fasta_ files without header lines that can be used for other purposes.
