@@ -36,9 +36,9 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 To view the full helper message with command line, please use `./DSBMain -h`.
 
 ##### _Example 1_
-We have data files **data/sample_X.txt** and **data/sample_Y.txt**. We assume that these files represent DNA sequencing data with **5\% insertion rate, 5\% deletion rate, and 5\% mutation rate**. We want our data structure to have **threshold 1=1000** and **threshold 2=1000000**. Then, we need to run the program with the following command:
+We have data files **data/pacbio_reads_5000.fasta** and **data/ecoli_genome_full.fasta**. We assume that the PacBio sequencing reads file has **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate**. We want our data structure to have **threshold 1=25000** and **threshold 2=250000000**. Then, we need to run the program with the following command:
 ```bash
-./DSBMain -x data/sample_X.txt -y data/sample_Y.txt -i 0.05 -d 0.05 -m 0.05 -a 1000 -k 1000000
+./DSBMain -x data/pacbio_reads_5000.fasta -y data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
 
 Without specifying the output name, the program will print the results to a default file named **output.txt**.
