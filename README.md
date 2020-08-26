@@ -18,7 +18,7 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 4. To remove installation, please `make clean`. This will remove everything generated after your initial download, except data files you generated using **DataGeneration**.
 
 ## How To Run
-#### **DSBMain**
+### **DSBMain**
 ```bash
 ./DSBMain -q [query file] -r [reference file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [add threshold] -k [kill threshold] -o [name] {-vh}
 
@@ -41,8 +41,13 @@ We have data files **data/pacbio_reads_5000.fasta** and **data/ecoli_genome_full
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
 
+To search reads against reads, we use the following commands:
+```bash
+./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
+```
+
 Without specifying the output name, the program will print the results to a default file named **output.txt**.
-#### **DataGeneration**
+### **DataGeneration**
 ```bash
 ./DataGeneration -i [insertion rate] -d [deletion rate] -m [mutation rate] -n [number of sequences] -s [initial length of a sequence] -p [path] -vh
 
