@@ -2,7 +2,7 @@
 Author(s): Chengze Shen, Mihir Mongia, Arash Gholami Davoodi, Guillaume Marcais, Hosein Mohimani
 
 ## What It Does
-DSB is a C++ based program to find overlaps among sequences and alignments of queries in a given genome. There are two input files: _X_ and _Y_ data in _.fasta_ format. The program will output, for every sequence in _Y_, the sequences in _X_ that overlaps with it. In case of a single file (_X_=_Y_), the program will avoid outputting self overlaps.
+DSB is a C++ based program to find overlaps among sequences and alignments of queries in a given genome. There are two input files, reference and query in _fasta_ format. Reference could be a set of reads or a reference genome. For each query sequence, the program outputs the reference sequences that overlap with it. In cases where query and reference are the same files, the program discards self-overlaps.
 
 The goal is to find as many as true overlapping sequences and alignments while minimizing false positives.
 
@@ -20,12 +20,12 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 ## How To Run
 #### **DSBMain**
 ```bash
-./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] -o [name] {-vh}
+./DSBMain -q [query file] -r [reference file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [add threshold] -k [kill threshold] -o [name] {-vh}
 
 -h              Print this block of information.
 -v              Verbose mode.
--x [path/to/x]  Path to X data file.
--y [path/to/y]  Path to Y data file.
+-q [path/to/q]  Path to the query file.
+-r [path/to/r]  Path to the reference file.
 -i [0<=i<1]     Insertion rate.
 -d [0<=d<1]     Deletion rate.
 -m [0<=e<0.5]   Mutation rate when neither insertion/deletion happens.
@@ -36,9 +36,9 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 To view the full helper message with command line, please use `./DSBMain -h`.
 
 ##### _Example 1_
-We have data files **data/pacbio_reads_5000.fasta** and **data/ecoli_genome_full.fasta**. We assume that the PacBio sequencing reads file has **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate**. We want our data structure to have **threshold 1=25000** and **threshold 2=250000000**. Then, we need to run the program with the following command:
+We have data files **data/pacbio_reads_5000.fasta** and **data/ecoli_genome_full.fasta**. We use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data:
 ```bash
-./DSBMain -x data/pacbio_reads_5000.fasta -y data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
+./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
 
 Without specifying the output name, the program will print the results to a default file named **output.txt**.
@@ -58,14 +58,12 @@ Without specifying the output name, the program will print the results to a defa
 To view the full helper message with command line, please use `./DataGeneration -h`.
 
 ##### _Example 2_
-We want to generate data files under the **data/** directory. We want the **insertion rate, deletion rate, and mutation rate all to be 5\%**. We want to generate **1000 sequence pairs** (each sequence pair contains two sequences: one for X and one for Y. They are generated with the intended insertion/deletion/mutation rates), each to be approximately **100 bp in length**. Then, we need to run the program with the following command:
+We generate **1000 sequence pairs** (each sequence pair contains a reference r and a query q) with **insertion, deletion, and mutation rate of 5%** and length of approximately **100 bp** using the following command:
 ```bash
 ./DataGeneration -i 0.05 -d 0.05 -m 0.05 -n 1000 -s 100 -p data
 ```
-The command will generate 4 files under **data/** directory, namely:
-* X1000_100_0.05_0.05.txt
-* Y1000_100_0.05_0.05.txt
-* s_1000_100_0.05_0.05.fasta
+The command will generate 2 files under **data/** directory, namely:
 * q_1000_100_0.05_0.05.fasta
+* r_1000_100_0.05_0.05.fasta
 
-The first two files are simply sequences extracted from _.fasta_ files without header lines that can be used for other purposes.
+where _q_1000_100_0.05_0.05.fasta_ corresponds to the queries in the sequence pairs and _r_1000_100_0.05_0.05.fasta_ corresponds to the references.
