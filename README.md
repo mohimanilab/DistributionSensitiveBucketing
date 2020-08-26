@@ -66,4 +66,4 @@ The command will generate 2 files under **data/** directory, namely:
 * q_1000_100_0.05_0.05.fasta
 * r_1000_100_0.05_0.05.fasta
 
-where _q_1000_100_0.05_0.05.fasta_ corresponds to the queries in the sequence pairs and _r_1000_100_0.05_0.05.fasta_ corresponds to the references.
+where **q_1000_100_0.05_0.05.fasta** corresponds to the queries in the sequence pairs and **r_1000_100_0.05_0.05.fasta** corresponds to the references.
