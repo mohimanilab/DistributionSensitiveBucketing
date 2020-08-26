@@ -144,46 +144,50 @@ void write_to(vector<vector<char>> &data, double insertion, double deletion,
               int num_of_seq, int len_of_seq, int which, string path,
               int precision) {
     ofstream file;
-    ofstream file2;
+    // ofstream file2;
     string filename;
-    string filename2;
+    // string filename2;
     ostringstream oss;
-    ostringstream oss2;
+    // ostringstream oss2;
 
     auto cstart = Clock::now();
     if (which == 0) {
-        cerr << "Writing X data files... ";
-        oss << path << "s_" << to_string(num_of_seq) << "_"
-            << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
-            << insertion << "_" << fixed << setprecision(precision) << deletion
-            << ".fasta";
-        oss2 << path << "X" << to_string(num_of_seq) << "_"
-             << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
-             << insertion << "_" << fixed << setprecision(precision) << deletion
-             << ".txt";
-    } else {
-        cerr << "Writing Y data files... ";
+        cerr << "Writing query data files... ";
         oss << path << "q_" << to_string(num_of_seq) << "_"
             << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
             << insertion << "_" << fixed << setprecision(precision) << deletion
             << ".fasta";
-        oss2 << path << "Y" << to_string(num_of_seq) << "_"
-             << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
-             << insertion << "_" << fixed << setprecision(precision) << deletion
-             << ".txt";
+        // oss2 << path << "X" << to_string(num_of_seq) << "_"
+        //     << to_string(len_of_seq) << "_" << fixed <<
+        //     setprecision(precision)
+        //     << insertion << "_" << fixed << setprecision(precision) <<
+        //     deletion
+        //     << ".txt";
+    } else {
+        cerr << "Writing reference data files... ";
+        oss << path << "r_" << to_string(num_of_seq) << "_"
+            << to_string(len_of_seq) << "_" << fixed << setprecision(precision)
+            << insertion << "_" << fixed << setprecision(precision) << deletion
+            << ".fasta";
+        // oss2 << path << "Y" << to_string(num_of_seq) << "_"
+        //     << to_string(len_of_seq) << "_" << fixed <<
+        //     setprecision(precision)
+        //     << insertion << "_" << fixed << setprecision(precision) <<
+        //     deletion
+        //     << ".txt";
     }
-    filename  = oss.str();
-    filename2 = oss2.str();
+    filename = oss.str();
+    // filename2 = oss2.str();
     file.open(filename);
-    file2.open(filename2);
+    // file2.open(filename2);
 
     // write as .fasta/.txt files
     for (int i = 0; i < data.size(); i++) {
         file << ">" << to_string(i) << endl << data[i] << endl;
-        file2 << data[i] << endl;
+        // file2 << data[i] << endl;
     }
     file.close();
-    file2.close();
+    // file2.close();
 
     auto cend = Clock::now();
     int dur =
@@ -252,7 +256,7 @@ int main(int argc, char **argv) {
     }
 
     // generate X,Y sequence pairs with given ins/del/mut rates
-    cerr << "Generating X,Y strings... ";
+    cerr << "Generating query and reference strings... ";
     vector<vector<char>> X;
     vector<vector<char>> Y;
     auto cstart = Clock::now();

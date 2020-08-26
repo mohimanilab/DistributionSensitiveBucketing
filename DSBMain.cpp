@@ -341,14 +341,14 @@ int alignment(vector<char> &x, vector<char> &y, int xstart, int ystart,
 
 // function to print needed arguments/documentation for this program
 void print_helper() {
-    printf(
-        "Usage: ./DSBMain -x [X file] -y [Y file] -i [insertion rate] -d "
-        "[deletion rate] -m [mutation rate] -a [threshold 1] -k [threshold 2] "
-        "-o [name] {-vh}\n\n");
+    printf("Usage: ./DSBMain -q [query file] -r [reference file] -i [insertion "
+           "rate] -d "
+           "[deletion rate] -m [mutation rate] -a [add threshold] "
+           "-k [kill threshold] -o [name] {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
     printf("-v\t\tVerbose mode.\n");
-    printf("-x [path/to/x]\tPath to X data file.\n");
-    printf("-y [path/to/y]\tPath to Y data file.\n");
+    printf("-q [path/to/q]\tPath to the query file.\n");
+    printf("-r [path/to/r]\tPath to the reference file.\n");
     printf("-i [0<=i<1]\tInsertion rate.\n");
     printf("-d [0<=d<1]\tDeletion rate.\n");
     printf("-m [0<=e<0.5]\tMutation rate when neither insertion/deletion "
@@ -709,10 +709,10 @@ int main(int argc, char **argv) {
     char opt;
     while ((opt = getopt(argc, argv, "hvx:y:i:d:m:a:k:o:")) != -1) {
         switch (opt) {
-        case 'x': // X datafile address
+        case 'q': // X datafile address
             xfile = optarg;
             break;
-        case 'y': // Y datafile address
+        case 'r': // Y datafile address
             yfile = optarg;
             break;
         case 'i': // insertion probability
@@ -800,7 +800,7 @@ int main(int argc, char **argv) {
     map<vector<char>, kmernode *> Ymer_tree;
 
     // (1) make kmer trees for X/Y with every position inserted
-    cerr << "Making k-mer trees for X and Y... ";
+    cerr << "Making k-mer trees for query and reference... ";
     cstart = Clock::now();
     make_kmer_tree(X, 0, 0, Xmer_tree);
     make_kmer_tree(Y, 0, 0, Ymer_tree);
