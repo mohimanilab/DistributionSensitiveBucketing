@@ -36,12 +36,12 @@ The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11*
 To view the full helper message with command line, please use `./DSBMain -h`.
 
 ##### _Example 1_
-We have data files **data/pacbio_reads_5000.fasta** and **data/ecoli_genome_full.fasta**. We use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data:
+Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data:
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
 
-To search reads against reads, we use the following commands:
+To search reads against reads, we use the following command:
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
