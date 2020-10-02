@@ -7,15 +7,14 @@ DSB is a C++ based program to find overlaps among sequences and alignments of qu
 The goal is to find as many as true overlapping sequences and alignments while minimizing false positives.
 
 ## Requirements
-### Linux
-   * We tested our program on **Ubuntu 18.04** with **g++ 7.5.0** and above and ISO standard **-std=c++11**.
-### macOS
-   * We also tested our program on **macOS 10.14.6** with **g++ 4.2.1** and above, ISO standard **-std=c++11** and **Apple LLVM 10.0.1**.
-### Python
-Currently, we use a python script to process the raw output files from our program.
+### C++
+   * **Linux**: We tested our program on **Ubuntu 18.04** with **g++ 7.5.0** and above and ISO standard **-std=c++11**.
+   * **macOS**: We also tested our program on **macOS 10.14.6** with **g++ 4.2.1** and above, ISO standard **-std=c++11** and **Apple LLVM 10.0.1**.
+### Python (3.7.5 and above)
+Currently, we use a python script to process the raw output files from our program. Please refer to [_Example 1_](#example-1) for the actual usage. In the future update, we are planning to integrate this functionality to the main C++ file.
 
 ## Installation
-1. Make sure the correct version of C++ compiler has been installed.
+1. Make sure the correct version of C++ compiler and Python has been installed.
 2. _**By default**_, _**use**_ `make` _**to generate everything (DSBMain, DataGeneration).**_ The installation should take about a few seconds.
 3. There are two binary executables you could generate separately.
     * To generate **DSBMain** (for DSB), please `make main`.
@@ -41,17 +40,21 @@ Currently, we use a python script to process the raw output files from our progr
 To view the full helper message with command line, please use `./DSBMain -h`.
 
 ##### _Example 1_
-Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data:
+Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data (this task should take ~10 minutes to run):
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
+Without specifying the output name, the program will print the results to a default file named **output.txt**. To process the output file for better readability, run the python script:
+```bash
+python mapResults.py -i output.txt
+```
+This will produce a file named **output_mapped.txt**, in which each line represents an overlap region. 
 
-To search reads against reads, we use the following command:
+To search reads against reads, we use the following command (this task should take ~25 minutes to run):
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
 
-Without specifying the output name, the program will print the results to a default file named **output.txt**.
 ### **DataGeneration**
 ```bash
 ./DataGeneration -i [insertion rate] -d [deletion rate] -m [mutation rate] -n [number of sequences] -s [initial length of a sequence] -p [path] -vh
