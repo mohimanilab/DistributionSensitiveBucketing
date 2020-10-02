@@ -57,6 +57,9 @@ def analyze_mapped(mapped):
             if cur_t[1] - cur_t[0] >= 100 and cur_q[1] - cur_q[0] >= 100:
                 alignments.append([cur_q, cur_t])
             cur_q, cur_t = [-1,-1], [-1,-1] # cur_alignments
+    if cur_q[0] != -1 and cur_t[0] != -1:
+        if cur_t[1] - cur_t[0] >= 100 and cur_q[1] - cur_q[0] >= 100:
+            alignments.append([cur_q, cur_t])
     return alignments
 
 def main():
