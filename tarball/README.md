@@ -11,8 +11,8 @@ The goal is to find as many as true overlapping sequences and alignments while m
    * We tested our program on **Ubuntu 18.04** with **g++ 7.5.0** and above and ISO standard **-std=c++11**.
 ### macOS
    * We also tested our program on **macOS 10.14.6** with **g++ 4.2.1** and above, ISO standard **-std=c++11** and **Apple LLVM 10.0.1**.
-
-No other software is required for running our program.
+### Python
+Currently, we use a python script to process the raw output files from our program.
 
 ## Installation
 1. Make sure the correct version of C++ compiler has been installed.
