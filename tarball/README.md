@@ -50,6 +50,7 @@ python mapResults.py -i output.txt
 ```
 This will produce a file named **output_mapped.txt**, in which each line represents an overlap region. 
 
+##### _Example 1.2_
 To search reads against reads, we use the following command (this task should take ~25 minutes to run):
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
