@@ -39,7 +39,7 @@ Currently, we use a python script to process the raw output files from our progr
 ```
 To view the full helper message with command line, please use `./DSBMain -h`.
 
-##### _Example 1_
+#### _Example 1_
 Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data (this task should take ~10 minutes to run):
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
@@ -48,9 +48,9 @@ Without specifying the output name, the program will print the results to a defa
 ```bash
 python mapResults.py -i output.txt
 ```
-This will produce a file named **output_mapped.txt**, in which each line represents an overlap region. 
+This will produce a file named **output_mapped.txt**, in which each line represents an overlap region. The expected output file from this example is included in the **output/** directory.
 
-##### _Example 1.2_
+#### _Example 1.2_
 To search reads against reads, we use the following command (this task should take ~25 minutes to run):
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
@@ -71,7 +71,7 @@ To search reads against reads, we use the following command (this task should ta
 ```
 To view the full helper message with command line, please use `./DataGeneration -h`.
 
-##### _Example 2_
+#### _Example 2_
 We generate **1000 sequence pairs** (each sequence pair contains a reference r and a query q) with **insertion, deletion, and mutation rate of 5%** and length of approximately **100 bp** using the following command:
 ```bash
 ./DataGeneration -i 0.05 -d 0.05 -m 0.05 -n 1000 -s 100 -p data
@@ -80,4 +80,4 @@ The command will generate 2 files under **data/** directory, namely:
 * q_1000_100_0.05_0.05.fasta
 * r_1000_100_0.05_0.05.fasta
 
-where **q_1000_100_0.05_0.05.fasta** corresponds to the queries in the sequence pairs and **r_1000_100_0.05_0.05.fasta** corresponds to the references.
+where **q_1000_100_0.05_0.05.fasta** corresponds to the queries in the sequence pairs and **r_1000_100_0.05_0.05.fasta** corresponds to the references. The expected output files from this example are included in the **data/** directory.
