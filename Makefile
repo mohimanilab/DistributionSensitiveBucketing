@@ -39,6 +39,12 @@ gen: DataGeneration.cpp
 		$(COMPILE_CMD) DataGeneration.cpp -o DataGeneration
 		echo "Done."
 
+tar:
+		tar -cvzf DSB.tar.gz tarball/*
+
+zip:
+		zip -r DSB.zip tarball
+
 format: DSBMain.cpp DataGeneration.cpp
 		clang-format -style=file -i DSBMain.cpp DataGeneration.cpp
 
