@@ -7,7 +7,10 @@ DSB is a C++ based program to find overlaps among sequences and alignments of qu
 The goal is to find as many as true overlapping sequences and alignments while minimizing false positives.
 
 ## Requirements
-The program is compiled with **g++ 4.2.1** and above, ISO standard **-std=c++11**. It was mainly tested on a MacBook Pro with **Apple LLVM 10.0.1**.
+### Linux
+We tested our program on **Ubuntu 18.04** with **g++ 7.5.0** and above and ISO standard **-std=c++11**.
+### macOS
+We also tested our program on **macOS 10.14.6** with **g++ 4.2.1** and above, ISO standard **-std=c++11** and **Apple LLVM 10.0.1**.
 
 ## Installation
 1. Make sure the correct version of C++ compiler has been installed.
