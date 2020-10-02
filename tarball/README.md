@@ -16,8 +16,8 @@ No other software is required for running our program.
 
 ## Installation
 1. Make sure the correct version of C++ compiler has been installed.
-2. _**By default**_, _**use**_ `make` _**to generate everything (DSBMain, DataGeneration).**_
-3. There are two binary executables you could generate.
+2. _**By default**_, _**use**_ `make` _**to generate everything (DSBMain, DataGeneration).**_ The installation should take about a few seconds.
+3. There are two binary executables you could generate separately.
     * To generate **DSBMain** (for DSB), please `make main`.
     * To generate **DataGeneration** (for generating simulation data), please `make gen`.
 4. To remove installation, please `make clean`. This will remove everything generated after your initial download, except data files you generated using **DataGeneration**.
