@@ -707,7 +707,7 @@ int main(int argc, char **argv) {
     int error_flag =
         !(argc == 15 || argc == 16 || argc == 17 || argc == 18 || argc == 19);
     char opt;
-    while ((opt = getopt(argc, argv, "hvx:y:i:d:m:a:k:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvr:q:i:d:m:a:k:o:")) != -1) {
         switch (opt) {
         case 'q': // X datafile address
             xfile = optarg;
