@@ -32,9 +32,9 @@ typedef chrono::high_resolution_clock Clock;
 
 // simple struct for kmer tree of X/Y
 struct kmernode {
-    bool visited = 0;
     vector<char> kmer;
     map<int, vector<int>> hashed;
+    bool visited = 0;
 
     kmernode(){};
 
@@ -826,6 +826,29 @@ int main(int argc, char **argv) {
     // (3) collect results from all buckets
     int align_thres = int(align_multi * range);
     cerr << "Collecting results (bucket size: " << buckets.size() << ")... ";
+    
+    // calculate memory usage from buckets: this could be the "actual"
+    // memory usage if we separate tree construction from assigning
+    // data into the buckets
+    long bucket_memory = 0;
+    for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
+        bucket_memory += sizeof(it->first);
+        bucket_memory += sizeof(it->second->x);
+        bucket_memory += sizeof(it->second->y);
+        bucket_memory += 4 * sizeof(double) + 16;
+        for (auto xit = it->second->hashX->hashed.cbegin();
+                xit != it->second->hashX->hashed.cend(); ++xit) {
+            bucket_memory += xit->second.size() * 4 + 4;
+        }
+
+        for (auto yit = it->second->hashY->hashed.cbegin();
+                 yit != it->second->hashY->hashed.cend(); ++yit) {
+            bucket_memory += yit->second.size() * 4 + 4;
+        }
+    }
+    cerr << "Bucket memory: " << bucket_memory << " bytes" << endl;
+    exit(0);
+
     cstart = Clock::now();
     for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
         for (auto xit = it->second->hashX->hashed.cbegin();
@@ -898,7 +921,7 @@ int main(int argc, char **argv) {
     cerr << t2 << " ms" << endl;
     xmer /= buckets.size();
     ymer /= buckets.size();
-
+    
     // (4) writing to local files
     cerr << "Writing results ... ";
     cstart = Clock::now();
