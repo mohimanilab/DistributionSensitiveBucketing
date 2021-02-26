@@ -133,6 +133,11 @@ struct greater_than {
     }
 } greater_than;
 
+// sort function for vector - sort by second element in pair
+bool sort_by_second(const pair<int, int> &a, const pair<int, int> &b) {
+    return (a.second < b.second);
+}
+
 /**************** End of classes/struct definitions ****************/
 
 /**************** operator overloading for print ****************/
@@ -700,7 +705,7 @@ int main(int argc, char **argv) {
     string output_name = "output.txt";
     double add_threshold, kill_threshold;
     double align_multi = 0.35;
-    int range          = 12;
+    int range          = 9;
     int verbose        = 0;
 
     // argument parsing
@@ -755,10 +760,11 @@ int main(int argc, char **argv) {
     p_match = 1.0 - p_ins - p_del;
 
     if (verbose) {
-        printf("X: %s\tY: %s\nInsertion: %.3f\tDeletion: %.3f\t\tMutation: "
+        printf("X: %s\tY: %s\nOutput: %s\nInsertion: %.3f\tDeletion: "
+               "%.3f\t\tMutation: "
                "%.3f\nThreshold 1: %.1f\tThreshold 2: %.1f\n\n",
-               xfile.c_str(), yfile.c_str(), p_ins, p_del, eps * 12,
-               add_threshold, kill_threshold);
+               xfile.c_str(), yfile.c_str(), output_name.c_str(), p_ins, p_del,
+               eps * 12, add_threshold, kill_threshold);
     }
 
     // call function to read in data
@@ -780,7 +786,7 @@ int main(int argc, char **argv) {
     // run for each b, sum all up
     // unordered_map<int, bool> matches;
     // map<pair<int, int>, long> mismatches;
-    map<pair<int, int>, set<pair<int, int>>> results;
+    map<pair<int, int>, vector<pair<int, int>>> results;
     map<pair<int, int>, pair<int, int>> cur_mapped_low;
     ofstream reports;
     int t0           = 0;
@@ -826,28 +832,28 @@ int main(int argc, char **argv) {
     // (3) collect results from all buckets
     int align_thres = int(align_multi * range);
     cerr << "Collecting results (bucket size: " << buckets.size() << ")... ";
-    
+
     // calculate memory usage from buckets: this could be the "actual"
     // memory usage if we separate tree construction from assigning
     // data into the buckets
-    long bucket_memory = 0;
-    for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
-        bucket_memory += sizeof(it->first);
-        bucket_memory += sizeof(it->second->x);
-        bucket_memory += sizeof(it->second->y);
-        bucket_memory += 4 * sizeof(double) + 16;
-        for (auto xit = it->second->hashX->hashed.cbegin();
-                xit != it->second->hashX->hashed.cend(); ++xit) {
-            bucket_memory += xit->second.size() * 4 + 4;
-        }
+    // long bucket_memory = 0;
+    // for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
+    //    bucket_memory += sizeof(it->first);
+    //    bucket_memory += sizeof(it->second->x);
+    //    bucket_memory += sizeof(it->second->y);
+    //    bucket_memory += 4 * sizeof(double) + 16;
+    //    for (auto xit = it->second->hashX->hashed.cbegin();
+    //            xit != it->second->hashX->hashed.cend(); ++xit) {
+    //        bucket_memory += xit->second.size() * 4 + 4;
+    //    }
 
-        for (auto yit = it->second->hashY->hashed.cbegin();
-                 yit != it->second->hashY->hashed.cend(); ++yit) {
-            bucket_memory += yit->second.size() * 4 + 4;
-        }
-    }
-    cerr << "Bucket memory: " << bucket_memory << " bytes" << endl;
-    exit(0);
+    //    for (auto yit = it->second->hashY->hashed.cbegin();
+    //             yit != it->second->hashY->hashed.cend(); ++yit) {
+    //        bucket_memory += yit->second.size() * 4 + 4;
+    //    }
+    //}
+    // cerr << "Bucket memory: " << bucket_memory << " bytes" << endl;
+    // exit(0);
 
     cstart = Clock::now();
     for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
@@ -861,17 +867,12 @@ int main(int argc, char **argv) {
                 // check alignment score (post-processing)
                 int align_score = 0;
                 int aligned_i, aligned_j;
+                pair<int, int> cur_xy = make_pair(xit->first, yit->first);
+
                 for (int i = 0; i < xit->second.size(); i++) {
                     for (int j = 0; j < yit->second.size(); j++) {
                         // if the current map point of (x,y) has been covered
                         // by previous alignment, then skip
-                        pair<int, int> cur_xy =
-                            make_pair(xit->first, yit->first);
-                        // if the pair is checked already (exists in the
-                        // result), then skip
-                        // if (results.find(cur_xy) != results.end()) {
-                        //    goto endloop;
-                        //}
                         if (((cur_mapped_low[cur_xy].first + range) >=
                                  xit->second[i] &&
                              cur_mapped_low[cur_xy].first < xit->second[i]) ||
@@ -896,15 +897,15 @@ int main(int argc, char **argv) {
                 }
             endloop:
                 if (align_score >= align_thres) {
-                    pair<int, int> key, val;
-                    key = make_pair(xit->first, yit->first);
+                    pair<int, int> val;
+                    // key = make_pair(xit->first, yit->first);
                     val = make_pair(xit->second[aligned_i],
                                     yit->second[aligned_j]);
-                    results[key].insert(val);
+                    results[cur_xy].push_back(val);
 
                     // update low end of the cur_mapped_low
-                    pair<int, int> cur_low = cur_mapped_low[key];
-                    cur_mapped_low[key] =
+                    pair<int, int> cur_low = cur_mapped_low[cur_xy];
+                    cur_mapped_low[cur_xy] =
                         make_pair(max(cur_low.first, xit->second[aligned_i]),
                                   max(cur_low.second, yit->second[aligned_j]));
                 }
@@ -921,20 +922,83 @@ int main(int argc, char **argv) {
     cerr << t2 << " ms" << endl;
     xmer /= buckets.size();
     ymer /= buckets.size();
-    
-    // (4) writing to local files
-    cerr << "Writing results ... ";
+
+    // (3.2) map results so they are connected
+    cerr << "Mapping and writing results in buckets... ";
     cstart = Clock::now();
     reports.open(output_name, ofstream::out);
-    for (auto it = results.cbegin(); it != results.cend(); ++it) {
-        // reports << it->first << ":" << *(it->second.begin()) << " -> "
-        //        << (it->second.rbegin())->first + range / 2 << ","
-        //        << (it->second.rbegin())->second + range / 2 << endl;
-        reports << it->first << ":" << it->second << endl;
+    for (auto paired = results.begin(); paired != results.end(); ++paired) {
+        int x = paired->first.first + 1;
+        int y = paired->first.second + 1;
+
+        // sort the vector by second position in pair, ascendingly
+        sort(paired->second.begin(), paired->second.end(), sort_by_second);
+        int q_start = -1, q_end = -1, t_start = -1, t_end = -1;
+
+        // vector of int to store aligned positions
+        // every 4 ints: q_start, q_end, t_start, t_end
+        // vector<int> alignments;
+
+        // iterate through all elements in a paired (x, y)
+        for (auto entry = paired->second.cbegin();
+             entry != paired->second.cend(); ++entry) {
+            int q_pos = entry->first, t_pos = entry->second;
+
+            // initialization
+            if (q_start == -1) {
+                q_start = q_pos, q_end = q_pos;
+            }
+            if (t_start == -1) {
+                t_start = t_pos, t_end = t_pos;
+            }
+
+            // case 1 - 500 bp for search close one (combine together)
+            if (t_pos - t_end <= 400) {
+                if (q_pos - q_end <= 400) {
+                    q_end = q_pos;
+                    t_end = t_pos;
+                } else {
+                    continue;
+                }
+            } else {
+                // if next one is beyond range AND
+                // if length has exceeds 100 bp, append such alignment
+                // as true one
+                if ((t_end - t_start >= 100) && (q_end - q_start >= 100)) {
+                    reports << x << " " << y << " " << q_start << " " << q_end
+                            << " " << t_start << " " << t_end << endl;
+                    // alignments.insert(alignments.end(),
+                    //        {q_start, q_end, t_start, t_end});
+                }
+                // reset alignment positions
+                q_start = q_pos, q_end = q_pos, t_start = t_pos, t_end = t_pos;
+            }
+        }
+        // add in the last one checked if it exists
+        if (q_start != -1 && t_start != -1) {
+            if ((q_end - q_start >= 100) && (t_end - t_start >= 100)) {
+                reports << x << " " << y << " " << q_start << " " << q_end
+                        << " " << t_start << " " << t_end << endl;
+            }
+        }
     }
     cend = Clock::now();
     t3   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
     cerr << t3 << " ms" << endl;
+
+    // (4) writing to local files
+    // cerr << "Writing results ... ";
+    // cstart = Clock::now();
+    // reports.open(output_name, ofstream::out);
+    // for (auto it = results.cbegin(); it != results.cend(); ++it) {
+    //    // reports << it->first << ":" << *(it->second.begin()) << " -> "
+    //    //        << (it->second.rbegin())->first + range / 2 << ","
+    //    //        << (it->second.rbegin())->second + range / 2 << endl;
+    //    reports << it->first << ":" << it->second << endl;
+    //}
+    // cend = Clock::now();
+    // t3   = chrono::duration_cast<chrono::milliseconds>(cend -
+    // cstart).count(); cerr << t3 << " ms" << endl;
 
     /* LOCAL ALIGNMENT END */
 

@@ -4,6 +4,7 @@ LDFLAGS=-g
 OPTIMIZE=-O3
 STATIC=-static
 CCSERVER=/projects/mohimanilab/anaconda2/bin/g++
+CLANG=clang-format-10
 
 .SILENT:
 
@@ -13,6 +14,7 @@ SCRIPT=../simulated_scripts
 COMPILE_CMD=$(CC) $(CXXFLAGS) $(OPTIMIZE) $(LDFLAGS)
 COMPILE_CMD_ORI=$(CC) $(CXXFLAGS) $(OPTIMIZE) $(LDFLAGS)
 COMPILE_SERVER=$(CCSERVER) $(CXXFLAGS) $(OPTIMIZE) $(LDFLAGS)
+
 
 # Check system type. If Linux, we make a static/stand-alone package
 # Otherwise OSX, then we just do dynamic link
@@ -46,7 +48,7 @@ zip:
 		zip -r DSB.zip tarball
 
 format: DSBMain.cpp DataGeneration.cpp
-		clang-format -style=file -i DSBMain.cpp DataGeneration.cpp
+		$(CLANG) -style=file -i DSBMain.cpp DataGeneration.cpp
 
 clean:
 		if [ -f DSBMain ]; then echo -e "removing DSBMain"; rm -f DSBMain; fi
