@@ -31,14 +31,14 @@ default: main gen
 #server: COMPILE_CMD=$(COMPILE_SERVER)
 #server: main gen
 
-main: DSBMain.cpp
+main: src/DSBMain.cpp
 		echo "Compiling data-dependent method with post-processing..."
-		$(COMPILE_CMD) DSBMain.cpp -o DSBMain
+		$(COMPILE_CMD) src/DSBMain.cpp -o DSBMain
 		echo "Done."
 
-gen: DataGeneration.cpp
+gen: src/DataGeneration.cpp
 		echo "Compiling simulation data generation..."
-		$(COMPILE_CMD) DataGeneration.cpp -o DataGeneration
+		$(COMPILE_CMD) src/DataGeneration.cpp -o DataGeneration
 		echo "Done."
 
 tar:
@@ -48,7 +48,7 @@ zip:
 		zip -r DSB.zip tarball
 
 format: DSBMain.cpp DataGeneration.cpp
-		$(CLANG) -style=file -i DSBMain.cpp DataGeneration.cpp
+		$(CLANG) -style=file -i src/DSBMain.cpp src/DataGeneration.cpp
 
 clean:
 		if [ -f DSBMain ]; then echo -e "removing DSBMain"; rm -f DSBMain; fi
