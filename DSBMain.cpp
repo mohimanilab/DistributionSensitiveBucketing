@@ -209,12 +209,13 @@ static int N;
 static int M;
 
 // independent hash tree mapping of buckets
-map<pair<vector<char>, vector<char>>, trn *> buckets;
+// map<pair<vector<char>, vector<char>>, trn *> buckets;
+vector<trn *> buckets;
 
-static double eps;
-static double p_ins;
-static double p_del;
-static double p_match;
+static double eps     = -1.;
+static double p_ins   = -1.;
+static double p_del   = -1.;
+static double p_match = -1.;
 
 // penalties for alignment
 static const int s_indel    = -1;
@@ -253,7 +254,7 @@ void readData(string xfile, string yfile) {
             continue;
         }
     } else {
-        cout << "X file not found in " << xfile << endl;
+        cerr << "X file not found in " << xfile << endl;
         exit(1);
     }
     if (fx.size() > 0)
@@ -279,7 +280,7 @@ void readData(string xfile, string yfile) {
             continue;
         }
     } else {
-        cout << "Y file not found in " << yfile << endl;
+        cerr << "Y file not found in " << yfile << endl;
         exit(1);
     }
     if (fy.size() > 0)
@@ -351,16 +352,20 @@ void print_helper() {
            "[deletion rate] -m [mutation rate] -a [add threshold] "
            "-k [kill threshold] -o [name] {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
-    printf("-v\t\tVerbose mode.\n");
-    printf("-q [path/to/q]\tPath to the query file.\n");
-    printf("-r [path/to/r]\tPath to the reference file.\n");
+    printf("\nModel:\n");
     printf("-i [0<=i<1]\tInsertion rate.\n");
     printf("-d [0<=d<1]\tDeletion rate.\n");
     printf("-m [0<=e<0.5]\tMutation rate when neither insertion/deletion "
            "happens.\n");
     printf("-a [a>0]\tThreshold for a node to be considered a bucket.\n");
     printf("-k [k>0]\tThreshold for a node to be pruned.\n");
-    printf("-o [name]\tSpecify output file name.\n\n");
+    printf("-b [path]\tIf specified, will use the given buckets file produced from a previously curated run\n");
+    printf("-s [path]\tInclude this option to save buckets from this run to local [path]. Disabled if '-b' is specified\n");
+    printf("\nOther settings:\n");
+    printf("-v\t\tVerbose mode.\n");
+    printf("-o [name]\tSpecify output file name.\n");
+    printf("-q [path/to/q]\tPath to the query file.\n");
+    printf("-r [path/to/r]\tPath to the reference file.\n\n");
 }
 
 // function to get total fp
@@ -372,12 +377,119 @@ long calc_fp_sum(map<pair<int, int>, long> &mismatches) {
     return total;
 }
 
+// function to write buckets to local
+void write_buckets(ofstream &buckets_file) {
+    for (auto it = buckets.begin(); it != buckets.end(); ++it) {
+        buckets_file << (*it)->x << "," << (*it)->y << endl;
+    }
+}
+
+// function to read buckets from local
+// remainder -> buckets: map<pair<vector<char>, vector<char>>, trn *> buckets;
+void read_buckets_from_file(string buckets_path) {
+    string line;
+    ifstream data_buckets;
+    data_buckets.open(buckets_path);
+
+    if (data_buckets.is_open()) {
+        while (getline(data_buckets, line)) {
+            stringstream ss(line);
+            vector<char> xmer, ymer;
+            string kmer;
+            int ind = 0;
+
+            while (getline(ss, kmer, ',')) {
+                if (ind == 0) {
+                    ind++;
+                    copy(kmer.begin(), kmer.end(), back_inserter(xmer));
+                } else {
+                    copy(kmer.begin(), kmer.end(), back_inserter(ymer));
+                    break;
+                }
+            }
+
+            // handle empty vectors
+            if (xmer.size() != 0 && ymer.size() != 0) {
+                pair<vector<char>, vector<char>> to_insert =
+                    make_pair(xmer, ymer);
+                trn *to_add   = new trn(0, 0, 0, xmer, ymer);
+                to_add->hashX = new kmernode();
+                to_add->hashY = new kmernode();
+                buckets.push_back(to_add);
+            }
+        }
+    } else {
+        cerr << "buckets file not found in " << buckets_path << endl;
+    }
+}
+
+// function to insert X and Y to buckets
+void insert_to_buckets(vector<vector<char>> &data, int t) {
+    // initialize to check
+    for (int ind = 0; ind < data.size(); ind++) {
+        vector<char> tohash = data[ind];
+        // examine every position
+        for (int i = 0; i < tohash.size(); i++) {
+            int front = 0, end = buckets.size(), mid = -1;
+            while (front != end) {
+                mid      = (front + end) / 2;
+                int len  = buckets[mid]->x.size();
+                int tail = min(int(tohash.size() - 1), i + len);
+                vector<char> subvec(&tohash[i], &tohash[tail]);
+
+                if (subvec == buckets[mid]->x || buckets[mid]->x.size() == 0) {
+                    if (t == 0)
+                        buckets[mid]->hashX->hashed[ind].push_back(i+len);
+                    else
+                        buckets[mid]->hashY->hashed[ind].push_back(i+len);
+
+                    int f = mid - 1;
+                    int e = mid + 1;
+
+                    // local search for all matches
+                    while (f >= front) {
+                        int f_len  = buckets[f]->x.size();
+                        int f_tail = min(int(tohash.size() - 1), i + f_len);
+                        vector<char> temp(&tohash[i], &tohash[f_tail]);
+
+                        if (temp == buckets[f]->x) {
+                            if (t == 0)
+                                buckets[f]->hashX->hashed[ind].push_back(i+f_len);
+                            else
+                                buckets[f]->hashY->hashed[ind].push_back(i+f_len);
+                            f--;
+                        } else
+                            break;
+                    }
+                    while (e < end) {
+                        int e_len  = buckets[e]->x.size();
+                        int e_tail = min(int(tohash.size() - 1), i + e_len);
+                        vector<char> temp(&tohash[i], &tohash[e_tail]);
+
+                        if (temp == buckets[e]->x) {
+                            if (t == 0)
+                                buckets[e]->hashX->hashed[ind].push_back(i+e_len);
+                            else
+                                buckets[e]->hashY->hashed[ind].push_back(i+e_len);
+                            e++;
+                        } else
+                            break;
+                    }
+                    break; // break from the searching for loop
+                } else if (subvec > buckets[mid]->x) {
+                    front = mid + 1;
+                } else {
+                    end = mid;
+                }
+            }
+        }
+    }
+}
+
 // method to pre-allocate a tree for X or Y-mer so that later we only
 // need to refer to these nodes
 void make_kmer_tree(vector<vector<char>> &target, int ind, int b,
                     map<vector<char>, kmernode *> &mapping) {
-    // cerr << "starting making kmer tree..." << endl;
-
     // root, init kmer
     kmernode *root = new kmernode();
     vector<char> init_kmer;
@@ -387,7 +499,7 @@ void make_kmer_tree(vector<vector<char>> &target, int ind, int b,
     map<int, vector<int>> init_hashed;
     for (int i = 0; i < target.size(); i++) {
         /* to insert every position into the kmer tree */
-        for (int j = 0; j < target[i].size() - 10; j++) {
+        for (int j = 0; j < target[i].size(); j++) {
             init_hashed[i].push_back(j);
         }
         /* new method end */
@@ -401,57 +513,6 @@ void make_kmer_tree(vector<vector<char>> &target, int ind, int b,
 
     // early return, only get the initial hash
     return;
-
-    // iterate till no more nodes can be added (the new nodes will have no
-    // kmers inside)
-    int total = 0;
-    while (!q.empty()) {
-        kmernode *cur = q.front();
-        q.pop();
-        total++;
-        // cerr << "on node " << cur->kmer << endl;
-
-        vector<char> cur_kmer = cur->kmer;
-
-        // else we continue on expanding the tree
-        for (int i = 0; i < 4; i++) {
-            // copy over the current alphabet and expand it
-            vector<char> next_kmer(cur_kmer);
-            next_kmer.push_back(alphabet[i]);
-
-            // create new node with expanded kmer
-            kmernode *next_kmernode = new kmernode();
-            next_kmernode->kmer     = next_kmer;
-
-            // iterate through current hashed sequences
-            // push in the ones that matched current kmer
-            for (auto it = cur->hashed.cbegin(); it != cur->hashed.cend();
-                 ++it) {
-                for (int m = 0; m < it->second.size(); m++) {
-                    // failsafe, if index out of bound
-                    if (it->second[m] >= X[it->first].size())
-                        continue;
-
-                    // check if the current position fits the last position
-                    // of next_kmer (assuming we have everything correct before)
-                    if (X[it->first][it->second[m]] == next_kmer.back()) {
-                        next_kmernode->hashed[it->first].push_back(
-                            it->second[m] + 1);
-                    }
-                }
-            }
-
-            // finish up by pushing the next kmernode to the map&queue
-            // IF the node is not empty
-            if (next_kmernode->hashed.size() > 0 &&
-                next_kmernode->kmer.size() < 30) {
-                // cerr << next_kmernode->hashed.cbegin()->first << endl;
-                mapping[next_kmer] = next_kmernode;
-                q.push(next_kmernode);
-            } else
-                delete next_kmernode;
-        }
-    }
 }
 
 // function to visit the kmernode and make its children
@@ -526,7 +587,9 @@ indpt_tree(double kill_threshold, double add_threshold,
     double total_q  = 0.0; // total q
 
     // keep inserting nodes and proceeding until no more nodes
+    int counter = 0;
     while (!q.empty()) {
+        counter++;
         // pop the next node
         trn *working = q.front();
         q.pop();
@@ -538,6 +601,7 @@ indpt_tree(double kill_threshold, double add_threshold,
         if ((working->hashX->size() + working->hashY->size()) / working->p >
             kill_threshold)
             continue;
+        // if (working->px / working->p > kill_threshold)
         if (working->hashX->size() == 0)
             continue; // if no more X prefixes
         if (working->hashY->size() == 0)
@@ -546,8 +610,8 @@ indpt_tree(double kill_threshold, double add_threshold,
         if ((working->p / working->q) > add_threshold) {
             pair<vector<char>, vector<char>> path =
                 make_pair(working->x, working->y);
-            trn *bucket   = new trn(working);
-            buckets[path] = bucket;
+            trn *bucket = new trn(working);
+            buckets.push_back(bucket);
             num_bucket++;
 
             total_p += bucket->p;
@@ -700,19 +764,24 @@ indpt_tree(double kill_threshold, double add_threshold,
 /***************** End of functions/variables ********************/
 
 int main(int argc, char **argv) {
-    string xfile       = "";
-    string yfile       = "";
-    string output_name = "output.txt";
+    string xfile        = "";
+    string yfile        = "";
+    string output_name  = "output.txt";
+    string buckets_path = "buckets.txt";
+    string save_buckets_path = "buckets.txt";
     double add_threshold, kill_threshold;
     double align_multi = 0.35;
     int range          = 9;
     int verbose        = 0;
+    bool save_buckets  = false; // whether to save buckets info for current run
+    bool read_buckets  = false;  // whether to use preexisting buckets
 
     // argument parsing
-    int error_flag =
-        !(argc == 15 || argc == 16 || argc == 17 || argc == 18 || argc == 19);
+    int error_flag = 0;
+    // int error_flag =
+    //    !(argc == 15 || argc == 16 || argc == 17 || argc == 18 || argc == 19);
     char opt;
-    while ((opt = getopt(argc, argv, "hvr:q:i:d:m:a:k:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvr:q:i:d:m:a:k:o:b:s:")) != -1) {
         switch (opt) {
         case 'q': // X datafile address
             xfile = optarg;
@@ -739,6 +808,14 @@ int main(int argc, char **argv) {
         case 'v': // verbose mode
             verbose = 1;
             break;
+        case 'b': // read in buckets - from the given path
+            buckets_path = optarg;
+            read_buckets = true;
+            break;
+        case 's': // save buckets to local
+            save_buckets_path = optarg;
+            save_buckets = true;
+            break;
         case 'o': // specify output file name
             output_name = optarg;
             break;
@@ -751,10 +828,24 @@ int main(int argc, char **argv) {
         }
     }
 
+    // check if any input file is missing
+    if (xfile.compare("") == 0 || yfile.compare("") == 0) {
+        cerr << "Either query or target file are missing." << endl;
+        print_helper();
+        exit(1);
+    }
+
     // check error flag for arguments
     if (error_flag || add_threshold <= 0 || kill_threshold <= 0) {
+        cerr << "Thresholds need to be positive." << endl;
         print_helper();
-        exit(error_flag);
+        exit(1);
+    }
+    // check if insertion deletion and mutation has been set
+    if (p_ins == -1. || p_del == -1. || eps == -1) {
+        cerr << "Need to set all paramters: ins/del/mutation rates" << endl;
+        print_helper();
+        exit(1);
     }
 
     p_match = 1.0 - p_ins - p_del;
@@ -788,15 +879,10 @@ int main(int argc, char **argv) {
     // map<pair<int, int>, long> mismatches;
     map<pair<int, int>, vector<pair<int, int>>> results;
     map<pair<int, int>, pair<int, int>> cur_mapped_low;
-    ofstream reports;
-    int t0           = 0;
-    int t1           = 0;
-    int t2           = 0;
-    int t3           = 0;
-    double xmer      = 0.0;
-    double ymer      = 0.0;
-    long num_bucket  = 0;
-    long total_nodes = 0;
+    ofstream reports, buckets_file;
+    int t0, t1, t2, t3 = 0;
+    double xmer, ymer            = 0.0;
+    long num_bucket, total_nodes = 0;
     double total_p, total_px, total_py, total_q = 0.0;
 
     /* LOCAL ALIGNMENT enabled. Check all positions in X matching to positions
@@ -815,19 +901,96 @@ int main(int argc, char **argv) {
     cerr << t0 << " ms" << endl;
 
     // (2) start constructing decision tree
-    cerr << "Making data-dependent tree for buckets... ";
-    cstart   = Clock::now();
-    auto tmp = indpt_tree(kill_threshold, add_threshold, Xmer_tree, Ymer_tree);
-    cend     = Clock::now();
-    t1 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
-    cerr << t1 << " ms" << endl;
+    if (!read_buckets) {
+        cerr << "Making data-dependent tree for buckets... ";
+        cstart = Clock::now();
+        auto tmp =
+            indpt_tree(kill_threshold, add_threshold, Xmer_tree, Ymer_tree);
+        sort(buckets.begin(), buckets.end(), less<trn>());
+        cend = Clock::now();
+        t1 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
+        cerr << t1 << " ms" << endl;
 
-    num_bucket  = get<0>(tmp);
-    total_nodes = get<1>(tmp);
-    total_p     = get<2>(tmp);
-    total_px    = get<3>(tmp);
-    total_py    = get<4>(tmp);
-    total_q     = get<5>(tmp);
+        num_bucket  = get<0>(tmp);
+        total_nodes = get<1>(tmp);
+        total_p     = get<2>(tmp);
+        total_px    = get<3>(tmp);
+        total_py    = get<4>(tmp);
+        total_q     = get<5>(tmp);
+    } else {
+        // or use existing buckets and insert X,Y to the buckets
+        cerr << "Using existing buckets file... ";
+        cstart = Clock::now();
+        read_buckets_from_file(buckets_path);
+
+        // sort buckets
+        sort(buckets.begin(), buckets.end(), less<trn>());
+
+        // insert X/Y to buckets
+        cerr << "Inserting X... ";
+        insert_to_buckets(X, 0);
+        for (int i = 0; i < buckets.size(); i++) {
+            buckets[i]->flipxy();
+        }
+        cerr << "Inserting Y... ";
+        insert_to_buckets(Y, 1);
+        for (int i = 0; i < buckets.size(); i++) {
+            buckets[i]->flipxy();
+        }
+
+        // quickly sort the vector just in case
+        for (auto it = buckets.begin(); it != buckets.end(); ++it) {
+            for (auto xit = (*it)->hashX->hashed.begin();
+                    xit != (*it)->hashX->hashed.end(); ++xit) {
+                sort(xit->second.begin(), xit->second.end());
+            }
+            for (auto yit = (*it)->hashY->hashed.begin();
+                    yit != (*it)->hashY->hashed.end(); ++yit) {
+                sort(yit->second.begin(), yit->second.end());
+            }
+        }
+        
+        cend = Clock::now();
+        t1 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
+        cerr << t1 << " ms" << endl;
+    }
+
+    // (DEBUG) iterate through all buckets and output corresponding
+    // X/Y out with correpsonding indexes
+    //for (auto it = buckets.begin(); it != buckets.end(); ++it) {
+    //    for (auto xit = (*it)->hashX->hashed.begin();
+    //            xit != (*it)->hashX->hashed.end(); ++xit) {
+    //        sort(xit->second.begin(), xit->second.end());
+    //        // xout first
+    //        cout << xit->first << ":";
+    //        for (int i = 0; i < xit->second.size(); i++) {
+    //            cout << xit->second[i] << ",";
+    //        }
+    //        cout << ";";
+    //    }
+    //    cout << endl;
+    //    for (auto yit = (*it)->hashY->hashed.begin();
+    //            yit != (*it)->hashY->hashed.end(); ++yit) {
+    //        sort(yit->second.begin(), yit->second.end());
+    //        //yout second
+    //        cout << yit->first << ":";
+    //        for (int i = 0; i < yit->second.size(); i++) {
+    //            cout << yit->second[i] << ",";
+    //        }
+    //        cout << ";";
+    //    }
+    //    cout << endl;
+    //}
+    //exit(0);
+
+    // (2.a) OPTIONAL: save bucket information to local
+    if (save_buckets && !read_buckets) {
+        cout << "Save buckets option detected, saving buckets to "
+            << save_buckets_path << endl;
+        buckets_file.open(save_buckets_path, ofstream::out);
+        write_buckets(buckets_file);
+        buckets_file.close();
+    }
 
     // (3) collect results from all buckets
     int align_thres = int(align_multi * range);
@@ -856,11 +1019,12 @@ int main(int argc, char **argv) {
     // exit(0);
 
     cstart = Clock::now();
-    for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
-        for (auto xit = it->second->hashX->hashed.cbegin();
-             xit != it->second->hashX->hashed.cend(); ++xit) {
-            for (auto yit = it->second->hashY->hashed.cbegin();
-                 yit != it->second->hashY->hashed.cend(); ++yit) {
+    for (auto it = buckets.begin(); it != buckets.end(); ++it) {
+        // quickly sort xit and yit hashX
+        for (auto xit = (*it)->hashX->hashed.cbegin();
+             xit != (*it)->hashX->hashed.cend(); ++xit) {
+            for (auto yit = (*it)->hashY->hashed.cbegin();
+                 yit != (*it)->hashY->hashed.cend(); ++yit) {
                 // if mapping within the same file, ignore self mapping
                 if (xfile == yfile && xit->first == yit->first)
                     continue;
@@ -914,8 +1078,8 @@ int main(int argc, char **argv) {
                 //    << yit->first << ":" << yit->second << endl;
             }
         }
-        xmer += (it->first.first).size();
-        ymer += (it->first.second).size();
+        xmer += (*it)->x.size();
+        ymer += (*it)->y.size();
     }
     cend = Clock::now();
     t2   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
