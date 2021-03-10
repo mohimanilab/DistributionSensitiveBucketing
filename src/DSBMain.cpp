@@ -359,8 +359,10 @@ void print_helper() {
            "happens.\n");
     printf("-a [a>0]\tThreshold for a node to be considered a bucket.\n");
     printf("-k [k>0]\tThreshold for a node to be pruned.\n");
-    printf("-b [path]\tIf specified, will use the given buckets file produced from a previously curated run\n");
-    printf("-s [path]\tInclude this option to save buckets from this run to local [path]. Disabled if '-b' is specified\n");
+    printf("-b [path]\tIf specified, will use the given buckets file produced "
+           "from a previously curated run\n");
+    printf("-s [path]\tInclude this option to save buckets from this run to "
+           "local [path]. Disabled if '-b' is specified\n");
     printf("\nOther settings:\n");
     printf("-v\t\tVerbose mode.\n");
     printf("-o [name]\tSpecify output file name.\n");
@@ -439,9 +441,9 @@ void insert_to_buckets(vector<vector<char>> &data, int t) {
 
                 if (subvec == buckets[mid]->x || buckets[mid]->x.size() == 0) {
                     if (t == 0)
-                        buckets[mid]->hashX->hashed[ind].push_back(i+len);
+                        buckets[mid]->hashX->hashed[ind].push_back(i + len);
                     else
-                        buckets[mid]->hashY->hashed[ind].push_back(i+len);
+                        buckets[mid]->hashY->hashed[ind].push_back(i + len);
 
                     int f = mid - 1;
                     int e = mid + 1;
@@ -454,9 +456,11 @@ void insert_to_buckets(vector<vector<char>> &data, int t) {
 
                         if (temp == buckets[f]->x) {
                             if (t == 0)
-                                buckets[f]->hashX->hashed[ind].push_back(i+f_len);
+                                buckets[f]->hashX->hashed[ind].push_back(i +
+                                                                         f_len);
                             else
-                                buckets[f]->hashY->hashed[ind].push_back(i+f_len);
+                                buckets[f]->hashY->hashed[ind].push_back(i +
+                                                                         f_len);
                             f--;
                         } else
                             break;
@@ -468,9 +472,11 @@ void insert_to_buckets(vector<vector<char>> &data, int t) {
 
                         if (temp == buckets[e]->x) {
                             if (t == 0)
-                                buckets[e]->hashX->hashed[ind].push_back(i+e_len);
+                                buckets[e]->hashX->hashed[ind].push_back(i +
+                                                                         e_len);
                             else
-                                buckets[e]->hashY->hashed[ind].push_back(i+e_len);
+                                buckets[e]->hashY->hashed[ind].push_back(i +
+                                                                         e_len);
                             e++;
                         } else
                             break;
@@ -764,17 +770,17 @@ indpt_tree(double kill_threshold, double add_threshold,
 /***************** End of functions/variables ********************/
 
 int main(int argc, char **argv) {
-    string xfile        = "";
-    string yfile        = "";
-    string output_name  = "output.txt";
-    string buckets_path = "buckets.txt";
-    string save_buckets_path = "buckets.txt";
+    string xfile             = "";
+    string yfile             = "";
+    string output_name       = "output.txt";
+    string buckets_path      = "";
+    string save_buckets_path = "";
     double add_threshold, kill_threshold;
     double align_multi = 0.35;
     int range          = 9;
     int verbose        = 0;
     bool save_buckets  = false; // whether to save buckets info for current run
-    bool read_buckets  = false;  // whether to use preexisting buckets
+    bool read_buckets  = false; // whether to use preexisting buckets
 
     // argument parsing
     int error_flag = 0;
@@ -814,7 +820,7 @@ int main(int argc, char **argv) {
             break;
         case 's': // save buckets to local
             save_buckets_path = optarg;
-            save_buckets = true;
+            save_buckets      = true;
             break;
         case 'o': // specify output file name
             output_name = optarg;
@@ -847,15 +853,28 @@ int main(int argc, char **argv) {
         print_helper();
         exit(1);
     }
+    // check if buckets paths are not empty
+    if (save_buckets && save_buckets_path.size() == 0) {
+        cerr << "Save buckets path is empty!" << endl;
+        print_helper();
+        exit(1);
+    }
+    if (read_buckets && buckets_path.size() == 0) {
+        cerr << "Read buckets path is empty!" << endl;
+        print_helper();
+        exit(1);
+    }
 
     p_match = 1.0 - p_ins - p_del;
 
     if (verbose) {
-        printf("X: %s\tY: %s\nOutput: %s\nInsertion: %.3f\tDeletion: "
+        printf("X: %s\tY: %s\nOutput: %s\n\tUse buckets: %d\tPath: %s\n\tSave "
+               "buckets: %d\tPath: %s\nInsertion: %.3f\tDeletion: "
                "%.3f\t\tMutation: "
                "%.3f\nThreshold 1: %.1f\tThreshold 2: %.1f\n\n",
-               xfile.c_str(), yfile.c_str(), output_name.c_str(), p_ins, p_del,
-               eps * 12, add_threshold, kill_threshold);
+               xfile.c_str(), yfile.c_str(), output_name.c_str(), read_buckets,
+               buckets_path.c_str(), save_buckets, save_buckets_path.c_str(),
+               p_ins, p_del, eps * 12, add_threshold, kill_threshold);
     }
 
     // call function to read in data
@@ -941,15 +960,15 @@ int main(int argc, char **argv) {
         // quickly sort the vector just in case
         for (auto it = buckets.begin(); it != buckets.end(); ++it) {
             for (auto xit = (*it)->hashX->hashed.begin();
-                    xit != (*it)->hashX->hashed.end(); ++xit) {
+                 xit != (*it)->hashX->hashed.end(); ++xit) {
                 sort(xit->second.begin(), xit->second.end());
             }
             for (auto yit = (*it)->hashY->hashed.begin();
-                    yit != (*it)->hashY->hashed.end(); ++yit) {
+                 yit != (*it)->hashY->hashed.end(); ++yit) {
                 sort(yit->second.begin(), yit->second.end());
             }
         }
-        
+
         cend = Clock::now();
         t1 = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
         cerr << t1 << " ms" << endl;
@@ -957,7 +976,7 @@ int main(int argc, char **argv) {
 
     // (DEBUG) iterate through all buckets and output corresponding
     // X/Y out with correpsonding indexes
-    //for (auto it = buckets.begin(); it != buckets.end(); ++it) {
+    // for (auto it = buckets.begin(); it != buckets.end(); ++it) {
     //    for (auto xit = (*it)->hashX->hashed.begin();
     //            xit != (*it)->hashX->hashed.end(); ++xit) {
     //        sort(xit->second.begin(), xit->second.end());
@@ -981,15 +1000,16 @@ int main(int argc, char **argv) {
     //    }
     //    cout << endl;
     //}
-    //exit(0);
+    // exit(0);
 
     // (2.a) OPTIONAL: save bucket information to local
     if (save_buckets && !read_buckets) {
         cout << "Save buckets option detected, saving buckets to "
-            << save_buckets_path << endl;
+             << save_buckets_path << endl;
         buckets_file.open(save_buckets_path, ofstream::out);
         write_buckets(buckets_file);
         buckets_file.close();
+        exit(0);
     }
 
     // (3) collect results from all buckets

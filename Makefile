@@ -47,7 +47,7 @@ tar:
 zip:
 		zip -r DSB.zip tarball
 
-format: DSBMain.cpp DataGeneration.cpp
+format: src/DSBMain.cpp src/DataGeneration.cpp
 		$(CLANG) -style=file -i src/DSBMain.cpp src/DataGeneration.cpp
 
 clean:
