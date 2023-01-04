@@ -1136,9 +1136,9 @@ int main(int argc, char **argv) {
                 t_start = t_pos, t_end = t_pos;
             }
 
-            // case 1 - 500 bp for search close one (combine together)
-            if (t_pos - t_end <= 400) {
-                if (q_pos - q_end <= 400) {
+            // case 1 - X bp for search close one (combine together)
+            if (t_pos - t_end <= 1500) {
+                if (q_pos - q_end <= 1500) {
                     q_end = q_pos;
                     t_end = t_pos;
                 } else {
