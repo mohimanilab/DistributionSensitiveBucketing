@@ -1173,7 +1173,7 @@ int main(int argc, char **argv) {
                     continue;
                 // check alignment score (post-processing)
                 int align_score = 0;
-                int aligned_i, aligned_j;
+                int aligned_i = 0; int aligned_j = 0;
                 pair<int, int> cur_xy = make_pair(xit->first, yit->first);
 
                 for (int i = 0; i < xit->second.size(); i++) {
@@ -1207,27 +1207,42 @@ int main(int argc, char **argv) {
                         if (align_score >= align_thres) {
                             aligned_i = i;
                             aligned_j = j;
-                            goto endloop;
+                            //goto endloop;
+                            /* 1.12.2023 - do not end the loop but search through
+                             * all pairs (can be slow but let's see)
+                             * to avoid not finding all possible pairs
+                             */
+                            pair<int, int> val;
+                            // key = make_pair(xit->first, yit->first);
+                            val = make_pair(xit->second[i],
+                                            yit->second[j]);
+                            results[cur_xy].push_back(val);
+
+                            // update low end of the cur_mapped_low
+                            pair<int, int> cur_low = cur_mapped_low[cur_xy];
+                            cur_mapped_low[cur_xy] =
+                                make_pair(max(cur_low.first, xit->second[i]),
+                                          max(cur_low.second, yit->second[j]));
                         }
                     }
                 }
-            endloop:
-                if (align_score >= align_thres) {
-                    pair<int, int> val;
-                    // key = make_pair(xit->first, yit->first);
-                    val = make_pair(xit->second[aligned_i],
-                                    yit->second[aligned_j]);
-                    results[cur_xy].push_back(val);
+            //endloop:
+            //    if (align_score >= align_thres) {
+            //        pair<int, int> val;
+            //        // key = make_pair(xit->first, yit->first);
+            //        val = make_pair(xit->second[aligned_i],
+            //                        yit->second[aligned_j]);
+            //        results[cur_xy].push_back(val);
 
-                    // update low end of the cur_mapped_low
-                    pair<int, int> cur_low = cur_mapped_low[cur_xy];
-                    cur_mapped_low[cur_xy] =
-                        make_pair(max(cur_low.first, xit->second[aligned_i]),
-                                  max(cur_low.second, yit->second[aligned_j]));
-                }
+            //        // update low end of the cur_mapped_low
+            //        pair<int, int> cur_low = cur_mapped_low[cur_xy];
+            //        cur_mapped_low[cur_xy] =
+            //            make_pair(max(cur_low.first, xit->second[aligned_i]),
+            //                      max(cur_low.second, yit->second[aligned_j]));
+            //    }
 
-                // reports << xit->first << ":" << xit->second << ";"
-                //    << yit->first << ":" << yit->second << endl;
+            //    // reports << xit->first << ":" << xit->second << ";"
+            //    //    << yit->first << ":" << yit->second << endl;
             }
         }
         xmer += (*it)->x.size();
