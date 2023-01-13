@@ -29,6 +29,16 @@ using namespace std;
 typedef chrono::high_resolution_clock Clock;
 
 /**************** Classes/Struct definitions ****************/
+// global alignment results
+struct alnresult {
+    vector<char> aln_x; // alignment of x
+    vector<char> aln_y; // alignment of y; should have same size as aln_x
+    double identity = 0.0;  // identity of the alignment
+    int start_idx = 0;      // starting idx in aln_x/aln_y that are not both gaps
+    int aln_score = 0;      // alignment score based on match/mismatch/indel scores
+
+    alnresult(){};
+};
 
 // simple struct for kmer tree of X/Y
 struct kmernode {
@@ -289,14 +299,19 @@ void readData(string xfile, string yfile) {
 }
 
 // alignment method for comparing two given data points
-int alignment(vector<char> &x, vector<char> &y, int xstart, int ystart,
-              int range) {
+//tuple<int, int, double, vector<char>*, vector<char>*>
+tuple<int, int, double>
+alignment(vector<char> &x, vector<char> &y, int xstart, int ystart, int xrange,
+          int yrange, bool b_backtrace) {
+    //alnresult * aln_result = new alnresult();
     // rows are x, columns are y
-    int xend = 0;
-    int yend = 0;
-    if (range != -1) {
-        xend = min(xstart + range + 1, int(x.size() + 1));
-        yend = min(ystart + range + 1, int(y.size() + 1));
+    int xend        = 0;
+    int yend        = 0;
+    double identity = 0.0; // identity score of alignment
+
+    if (xrange != -1 && yrange != -1) {
+        xend = min(xstart + xrange + 1, int(x.size() + 1));
+        yend = min(ystart + yrange + 1, int(y.size() + 1));
     } else {
         xend = x.size() + 1;
         yend = y.size() + 1;
@@ -305,10 +320,10 @@ int alignment(vector<char> &x, vector<char> &y, int xstart, int ystart,
 
     // initialize first column/row
     for (int i = 1; i < xend - xstart; i++) {
-        matrix[i][0] = matrix[i - 1][0] - 1;
+        matrix[i][0] = matrix[i - 1][0] + s_indel;
     }
     for (int j = 1; j < yend - ystart; j++) {
-        matrix[0][j] = matrix[0][j - 1] - 1;
+        matrix[0][j] = matrix[0][j - 1] + s_indel;
     }
 
     // run alignment
@@ -342,7 +357,109 @@ int alignment(vector<char> &x, vector<char> &y, int xstart, int ystart,
             }
         }
     }
-    return matrix[xend - xstart - 1][yend - ystart - 1];
+
+    // reconstruct the alignment if backtracing
+    if (b_backtrace) {
+        // maximum length of alignment
+        int max_aln_len = xend - xstart + yend - ystart - 2;
+        int xpos = max_aln_len; int ypos = max_aln_len;
+        int aln_len = 0; int exact_match = 0; int start_idx = 0;
+        int i = xend - xstart - 1;
+        int j = yend - ystart - 1;
+        vector<char> tmp_x(max_aln_len + 1, '-');
+        vector<char> tmp_y(max_aln_len + 1, '-');
+
+        // read from the last position of the matrix to backtrace
+        while (i != 0 && j != 0) {
+            // diagonal - match
+            if (x[xstart + i - 1] == y[ystart + j - 1]) {
+                exact_match++;
+                tmp_x[xpos--] = x[xstart + i - 1];
+                tmp_y[ypos--] = y[ystart + j - 1];
+                i--;
+                j--;
+            }
+            // diagonal - mismatch
+            else if (matrix[i][j] == matrix[i - 1][j - 1] + s_mismatch) {
+                tmp_x[xpos--] = x[xstart + i - 1];
+                tmp_y[ypos--] = y[ystart + j - 1];
+                i--;
+                j--;
+            }
+            // from top
+            else if (matrix[i][j] == matrix[i - 1][j] + s_indel) {
+                tmp_x[xpos--] = x[xstart + i - 1];
+                tmp_y[ypos--] = '-';
+                i--;
+            }
+            // from left
+            else if (matrix[i][j] == matrix[i][j - 1] + s_indel) {
+                tmp_x[xpos--] = '-';
+                tmp_y[ypos--] = y[ystart + j - 1];
+                j--;
+            }
+            aln_len++;
+        }
+        // insertions/deletions at head
+        while (xpos > 0) {
+            if (i > 0) {
+                tmp_x[xpos--] = x[xstart + i - 1];
+                aln_len++; i--;
+            } else
+                tmp_x[xpos--] = '-';
+        }
+        while (ypos > 0) {
+            if (j > 0) {
+                tmp_y[ypos--] = y[ystart + j - 1];
+                aln_len++; j--;
+            } else
+                tmp_y[ypos--] = '-';
+        }
+        identity = ((double)(exact_match)) / ((double) aln_len);
+        
+        // get the start of the alignment (i.e., identify the first index where
+        // at least one of tmp_x/tmp_y has a character)
+        for (int k = max_aln_len; k >= 1; k--) {
+            if (tmp_x[k] == '-' && tmp_y[k] == '-') {
+                start_idx = k + 1;
+                break;
+            }
+        }
+        return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1],
+                start_idx, identity);
+    }
+    else {
+        return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1], 0, 0.0);
+    }
+}
+
+// 1.10.2023 - post-process filtering with a global alignment to check
+// if the mapped query-target region is valid (e.g., alignment with identity
+// >= some threshold such as 60%)
+void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
+                      int q_start, int q_end, int t_start, int t_end) {
+    // q and t are 1-based, NEED TO SUBTRACT BY 1
+    double identity = 0.0;
+    int aln_score = 0; int start_idx = 0;
+
+    // compute an alignment between query q and target t, in the respectively
+    // mapped region q[q_start:q_end] and t[t_start:t_end]
+    auto ret = alignment(X[q-1], Y[t-1], q_start, t_start, q_end - q_start,
+                          t_end - t_start, true);
+    aln_score = get<0>(ret);
+    start_idx = get<1>(ret);
+    identity  = get<2>(ret);
+
+    // if the alignment has >= id_threshold identity score, then we report it
+    if (identity >= id_threshold) {
+        reports << q << " " << t << " " << q_start << " " << q_end << " "
+                << t_start << " " << t_end << " "
+                << round(100 * identity / 0.01) * 0.01 << endl;
+                //<< " " << aln_result->aln_x
+                //<< " " << aln_result->aln_y << endl;
+    }
+
+    //delete aln_result;
 }
 
 // function to print needed arguments/documentation for this program
@@ -607,6 +724,10 @@ indpt_tree(double kill_threshold, double add_threshold,
         if ((working->hashX->size() + working->hashY->size()) / working->p >
             kill_threshold)
             continue;
+        /* 1.11.2023 - a failsafe for making kmers too deep */
+        if (working->x.size() > 9 || working->y.size() > 9)
+            continue;
+        /* failsafe ends */
         // if (working->px / working->p > kill_threshold)
         if (working->hashX->size() == 0)
             continue; // if no more X prefixes
@@ -775,12 +896,13 @@ int main(int argc, char **argv) {
     string output_name       = "output.txt";
     string buckets_path      = "";
     string save_buckets_path = "";
+    double id_threshold = 0.5;
     double add_threshold, kill_threshold;
-    double align_multi = 0.35;
-    int range          = 9;
-    int verbose        = 0;
-    bool save_buckets  = false; // whether to save buckets info for current run
-    bool read_buckets  = false; // whether to use preexisting buckets
+    double align_multi  = 0.35;
+    int range           = 9;
+    int verbose         = 0;
+    bool save_buckets   = false; // whether to save buckets info for current run
+    bool read_buckets   = false; // whether to use preexisting buckets
 
     // argument parsing
     int error_flag = 0;
@@ -1009,6 +1131,7 @@ int main(int argc, char **argv) {
         buckets_file.open(save_buckets_path, ofstream::out);
         write_buckets(buckets_file);
         buckets_file.close();
+        cout << "Exiting..." << endl;
         exit(0);
     }
 
@@ -1066,10 +1189,19 @@ int main(int argc, char **argv) {
                             continue;
                         }
 
-                        align_score = max(
-                            align_score,
-                            alignment(X[xit->first], Y[yit->first],
-                                      xit->second[i], yit->second[j], range));
+                        // 1.30.2023 - since I changed the alignment function
+                        // the returned item also include the actual alignment
+                        // TESTING OUT its impact on performance
+                        auto ret = alignment(
+                            X[xit->first], Y[yit->first], xit->second[i],
+                            yit->second[j], range, range, false);
+                        align_score = max(align_score, get<0>(ret));
+                        //delete aln_result;
+                        // align_score = max(
+                        //     align_score,
+                        //     alignment(X[xit->first], Y[yit->first],
+                        //               xit->second[i], yit->second[j],
+                        //               range, range, false));
 
                         // if alignment score is good, then end the loop
                         if (align_score >= align_thres) {
@@ -1137,8 +1269,8 @@ int main(int argc, char **argv) {
             }
 
             // case 1 - X bp for search close one (combine together)
-            if (t_pos - t_end <= 1500) {
-                if (q_pos - q_end <= 1500) {
+            if (t_pos - t_end <= 2000) {
+                if (q_pos - q_end <= 2000) {
                     q_end = q_pos;
                     t_end = t_pos;
                 } else {
@@ -1149,10 +1281,17 @@ int main(int argc, char **argv) {
                 // if length has exceeds 100 bp, append such alignment
                 // as true one
                 if ((t_end - t_start >= 100) && (q_end - q_start >= 100)) {
-                    reports << x << " " << y << " " << q_start << " " << q_end
-                            << " " << t_start << " " << t_end << endl;
-                    // alignments.insert(alignments.end(),
-                    //        {q_start, q_end, t_start, t_end});
+                    /* 1.10.2023 - UPDATE to have an additional post-filtering
+                     * step. That is, run a global alignment between the mapped
+                     * region to see if the alignment identity is above a set
+                     * threshold, e.g., 60%. If yes then write to output.
+                     */
+                    filter_and_write(reports, id_threshold, x, y, q_start,
+                                     q_end, t_start, t_end);
+                    /* 1.10.2023 - UPDATE ends */
+
+                    //reports << x << " " << y << " " << q_start << " " <<
+                    //    q_end << " " << t_start << " " << t_end << endl;
                 }
                 // reset alignment positions
                 q_start = q_pos, q_end = q_pos, t_start = t_pos, t_end = t_pos;
@@ -1160,9 +1299,11 @@ int main(int argc, char **argv) {
         }
         // add in the last one checked if it exists
         if (q_start != -1 && t_start != -1) {
-            if ((q_end - q_start >= 100) && (t_end - t_start >= 100)) {
-                reports << x << " " << y << " " << q_start << " " << q_end
-                        << " " << t_start << " " << t_end << endl;
+            if ((t_end - t_start >= 100) && (q_end - q_start >= 100)) {
+                filter_and_write(reports, id_threshold, x, y, q_start,
+                                 q_end, t_start, t_end);
+                //reports << x << " " << y << " " << q_start << " " << q_end
+                //        << " " << t_start << " " << t_end << endl;
             }
         }
     }
