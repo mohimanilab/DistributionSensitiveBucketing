@@ -4,7 +4,7 @@ LDFLAGS=-g
 OPTIMIZE=-O3
 STATIC=-static
 CCSERVER=/projects/mohimanilab/anaconda2/bin/g++
-CLANG=clang-format-10
+CLANG=clang-format
 
 .SILENT:
 

@@ -31,11 +31,11 @@ typedef chrono::high_resolution_clock Clock;
 /**************** Classes/Struct definitions ****************/
 // global alignment results
 struct alnresult {
-    vector<char> aln_x; // alignment of x
-    vector<char> aln_y; // alignment of y; should have same size as aln_x
-    double identity = 0.0;  // identity of the alignment
-    int start_idx = 0;      // starting idx in aln_x/aln_y that are not both gaps
-    int aln_score = 0;      // alignment score based on match/mismatch/indel scores
+    vector<char> aln_x;    // alignment of x
+    vector<char> aln_y;    // alignment of y; should have same size as aln_x
+    double identity = 0.0; // identity of the alignment
+    int start_idx   = 0;   // starting idx in aln_x/aln_y that are not both gaps
+    int aln_score   = 0; // alignment score based on match/mismatch/indel scores
 
     alnresult(){};
 };
@@ -146,6 +146,15 @@ struct greater_than {
 // sort function for vector - sort by second element in pair
 bool sort_by_second(const pair<int, int> &a, const pair<int, int> &b) {
     return (a.second < b.second);
+}
+
+// sort function for vector - sort by second element then by first
+bool sort_by_second_then_first(const pair<int, int> &a,
+                               const pair<int, int> &b) {
+    if (a.second != b.second)
+        return (a.second < b.second);
+    else
+        return (a.first < b.first);
 }
 
 /**************** End of classes/struct definitions ****************/
@@ -299,12 +308,12 @@ void readData(string xfile, string yfile) {
 }
 
 // alignment method for comparing two given data points
-//tuple<int, int, double, vector<char>*, vector<char>*>
-tuple<int, int, double>
-alignment(vector<char> &x, vector<char> &y, int xstart, int ystart, int xrange,
-          int yrange, bool b_backtrace) {
-    //alnresult * aln_result = new alnresult();
-    // rows are x, columns are y
+// tuple<int, int, double, vector<char>*, vector<char>*>
+tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
+                                  int ystart, int xrange, int yrange,
+                                  bool b_backtrace) {
+    // alnresult * aln_result = new alnresult();
+    //  rows are x, columns are y
     int xend        = 0;
     int yend        = 0;
     double identity = 0.0; // identity score of alignment
@@ -362,10 +371,13 @@ alignment(vector<char> &x, vector<char> &y, int xstart, int ystart, int xrange,
     if (b_backtrace) {
         // maximum length of alignment
         int max_aln_len = xend - xstart + yend - ystart - 2;
-        int xpos = max_aln_len; int ypos = max_aln_len;
-        int aln_len = 0; int exact_match = 0; int start_idx = 0;
-        int i = xend - xstart - 1;
-        int j = yend - ystart - 1;
+        int xpos        = max_aln_len;
+        int ypos        = max_aln_len;
+        int aln_len     = 0;
+        int exact_match = 0;
+        int start_idx   = 0;
+        int i           = xend - xstart - 1;
+        int j           = yend - ystart - 1;
         vector<char> tmp_x(max_aln_len + 1, '-');
         vector<char> tmp_y(max_aln_len + 1, '-');
 
@@ -404,19 +416,21 @@ alignment(vector<char> &x, vector<char> &y, int xstart, int ystart, int xrange,
         while (xpos > 0) {
             if (i > 0) {
                 tmp_x[xpos--] = x[xstart + i - 1];
-                aln_len++; i--;
+                aln_len++;
+                i--;
             } else
                 tmp_x[xpos--] = '-';
         }
         while (ypos > 0) {
             if (j > 0) {
                 tmp_y[ypos--] = y[ystart + j - 1];
-                aln_len++; j--;
+                aln_len++;
+                j--;
             } else
                 tmp_y[ypos--] = '-';
         }
-        identity = ((double)(exact_match)) / ((double) aln_len);
-        
+        identity = ((double)(exact_match)) / ((double)aln_len);
+
         // get the start of the alignment (i.e., identify the first index where
         // at least one of tmp_x/tmp_y has a character)
         for (int k = max_aln_len; k >= 1; k--) {
@@ -426,9 +440,8 @@ alignment(vector<char> &x, vector<char> &y, int xstart, int ystart, int xrange,
             }
         }
         return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1],
-                start_idx, identity);
-    }
-    else {
+                          start_idx, identity);
+    } else {
         return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1], 0, 0.0);
     }
 }
@@ -440,11 +453,12 @@ void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
                       int q_start, int q_end, int t_start, int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
     double identity = 0.0;
-    int aln_score = 0; int start_idx = 0;
+    int aln_score   = 0;
+    int start_idx   = 0;
 
     // compute an alignment between query q and target t, in the respectively
     // mapped region q[q_start:q_end] and t[t_start:t_end]
-    auto ret = alignment(X[q-1], Y[t-1], q_start, t_start, q_end - q_start,
+    auto ret  = alignment(X[q - 1], Y[t - 1], q_start, t_start, q_end - q_start,
                           t_end - t_start, true);
     aln_score = get<0>(ret);
     start_idx = get<1>(ret);
@@ -455,11 +469,11 @@ void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
         reports << q << " " << t << " " << q_start << " " << q_end << " "
                 << t_start << " " << t_end << " "
                 << round(100 * identity / 0.01) * 0.01 << endl;
-                //<< " " << aln_result->aln_x
-                //<< " " << aln_result->aln_y << endl;
+        //<< " " << aln_result->aln_x
+        //<< " " << aln_result->aln_y << endl;
     }
 
-    //delete aln_result;
+    // delete aln_result;
 }
 
 // function to print needed arguments/documentation for this program
@@ -896,13 +910,15 @@ int main(int argc, char **argv) {
     string output_name       = "output.txt";
     string buckets_path      = "";
     string save_buckets_path = "";
-    double id_threshold = 0.5;
+    double id_threshold      = 0.7;
     double add_threshold, kill_threshold;
-    double align_multi  = 0.35;
-    int range           = 9;
-    int verbose         = 0;
-    bool save_buckets   = false; // whether to save buckets info for current run
-    bool read_buckets   = false; // whether to use preexisting buckets
+    double align_multi = 0.35;  // for pre-filtering alignment
+    int range         = 9;      // pre-filtering alignment length
+    int search_range  = 300;    // maximum gap for connecting two maps
+    int map_len_thres = 300;    // minimum alignment length to report
+    int verbose       = 0;
+    bool save_buckets = false;  // whether to save buckets info for current run
+    bool read_buckets = false;  // whether to use preexisting buckets
 
     // argument parsing
     int error_flag = 0;
@@ -1019,7 +1035,7 @@ int main(int argc, char **argv) {
     // unordered_map<int, bool> matches;
     // map<pair<int, int>, long> mismatches;
     map<pair<int, int>, vector<pair<int, int>>> results;
-    map<pair<int, int>, pair<int, int>> cur_mapped_low;
+    // map<pair<int, int>, pair<int, int>> cur_mapped_low;
     ofstream reports, buckets_file;
     int t0, t1, t2, t3 = 0;
     double xmer, ymer            = 0.0;
@@ -1172,77 +1188,84 @@ int main(int argc, char **argv) {
                 if (xfile == yfile && xit->first == yit->first)
                     continue;
                 // check alignment score (post-processing)
-                int align_score = 0;
-                int aligned_i = 0; int aligned_j = 0;
+                int align_score       = 0;
+                int aligned_i         = 0;
+                int aligned_j         = 0;
                 pair<int, int> cur_xy = make_pair(xit->first, yit->first);
+                // pair<int, int> cur_mapped_low = make_pair(-range, -range);
 
                 for (int i = 0; i < xit->second.size(); i++) {
                     for (int j = 0; j < yit->second.size(); j++) {
                         // if the current map point of (x,y) has been covered
                         // by previous alignment, then skip
-                        if (((cur_mapped_low[cur_xy].first + range) >=
-                                 xit->second[i] &&
-                             cur_mapped_low[cur_xy].first < xit->second[i]) ||
-                            ((cur_mapped_low[cur_xy].second + range) >=
-                                 yit->second[j] &&
-                             cur_mapped_low[cur_xy].second < yit->second[j])) {
-                            continue;
-                        }
+                        // if (((cur_mapped_low.first + range) >=
+                        //         xit->second[i] &&
+                        //     cur_mapped_low.first < xit->second[i]) ||
+                        //    ((cur_mapped_low.second + range) >=
+                        //         yit->second[j] &&
+                        //     cur_mapped_low.second < yit->second[j])) {
+                        //    continue;
+                        //}
 
                         // 1.30.2023 - since I changed the alignment function
                         // the returned item also include the actual alignment
                         // TESTING OUT its impact on performance
-                        auto ret = alignment(
-                            X[xit->first], Y[yit->first], xit->second[i],
-                            yit->second[j], range, range, false);
-                        align_score = max(align_score, get<0>(ret));
-                        //delete aln_result;
-                        // align_score = max(
-                        //     align_score,
-                        //     alignment(X[xit->first], Y[yit->first],
-                        //               xit->second[i], yit->second[j],
-                        //               range, range, false));
+                        // pair<int, int> val = make_pair(xit->second[i],
+                        //        yit->second[j]);
+                        // results[cur_xy].push_back(val);
+                        auto ret    = alignment(X[xit->first], Y[yit->first],
+                                                xit->second[i], yit->second[j],
+                                                range, range, false);
+                        align_score = get<0>(ret);
+                        // align_score = max(align_score, get<0>(ret));
+                        //  align_score = max(
+                        //      align_score,
+                        //      alignment(X[xit->first], Y[yit->first],
+                        //                xit->second[i], yit->second[j],
+                        //                range, range, false));
 
                         // if alignment score is good, then end the loop
                         if (align_score >= align_thres) {
                             aligned_i = i;
                             aligned_j = j;
-                            //goto endloop;
-                            /* 1.12.2023 - do not end the loop but search through
-                             * all pairs (can be slow but let's see)
-                             * to avoid not finding all possible pairs
+                            // goto endloop;
+                            /* 1.12.2023 - do not end the loop but search
+                             * through all pairs (can be slow but let's see) to
+                             * avoid not finding all possible pairs
                              */
                             pair<int, int> val;
                             // key = make_pair(xit->first, yit->first);
-                            val = make_pair(xit->second[i],
-                                            yit->second[j]);
+                            val = make_pair(xit->second[i], yit->second[j]);
                             results[cur_xy].push_back(val);
 
-                            // update low end of the cur_mapped_low
-                            pair<int, int> cur_low = cur_mapped_low[cur_xy];
-                            cur_mapped_low[cur_xy] =
-                                make_pair(max(cur_low.first, xit->second[i]),
-                                          max(cur_low.second, yit->second[j]));
+                            //// update low end of the cur_mapped_low
+                            // pair<int, int> cur_low = cur_mapped_low[cur_xy];
+                            // cur_mapped_low[cur_xy] =
+                            //     make_pair(max(cur_low.first, xit->second[i]),
+                            //               max(cur_low.second,
+                            //               yit->second[j]));
                         }
                     }
                 }
-            //endloop:
-            //    if (align_score >= align_thres) {
-            //        pair<int, int> val;
-            //        // key = make_pair(xit->first, yit->first);
-            //        val = make_pair(xit->second[aligned_i],
-            //                        yit->second[aligned_j]);
-            //        results[cur_xy].push_back(val);
+                // endloop:
+                //     if (align_score >= align_thres) {
+                //         pair<int, int> val;
+                //         // key = make_pair(xit->first, yit->first);
+                //         val = make_pair(xit->second[aligned_i],
+                //                         yit->second[aligned_j]);
+                //         results[cur_xy].push_back(val);
 
-            //        // update low end of the cur_mapped_low
-            //        pair<int, int> cur_low = cur_mapped_low[cur_xy];
-            //        cur_mapped_low[cur_xy] =
-            //            make_pair(max(cur_low.first, xit->second[aligned_i]),
-            //                      max(cur_low.second, yit->second[aligned_j]));
-            //    }
+                //        // update low end of the cur_mapped_low
+                //        pair<int, int> cur_low = cur_mapped_low[cur_xy];
+                //        cur_mapped_low[cur_xy] =
+                //            make_pair(max(cur_low.first,
+                //            xit->second[aligned_i]),
+                //                      max(cur_low.second,
+                //                      yit->second[aligned_j]));
+                //    }
 
-            //    // reports << xit->first << ":" << xit->second << ";"
-            //    //    << yit->first << ":" << yit->second << endl;
+                //    // reports << xit->first << ":" << xit->second << ";"
+                //    //    << yit->first << ":" << yit->second << endl;
             }
         }
         xmer += (*it)->x.size();
@@ -1258,69 +1281,152 @@ int main(int argc, char **argv) {
     cerr << "Mapping and writing results in buckets... ";
     cstart = Clock::now();
     reports.open(output_name, ofstream::out);
-    for (auto paired = results.begin(); paired != results.end(); ++paired) {
-        int x = paired->first.first + 1;
-        int y = paired->first.second + 1;
 
-        // sort the vector by second position in pair, ascendingly
-        sort(paired->second.begin(), paired->second.end(), sort_by_second);
-        int q_start = -1, q_end = -1, t_start = -1, t_end = -1;
+    /////////// TEMP output to see what are the mapped pairs
+    // for (auto paired = results.begin(); paired != results.end(); ++paired) {
+    //     sort(paired->second.begin(), paired->second.end(),
+    //     sort_by_second_then_first); int x = paired->first.first + 1; int y =
+    //     paired->first.second + 1; reports << x << "," << y << ": " <<
+    //     paired->second << endl;
+    // }
+
+    for (auto paired = results.begin(); paired != results.end(); ++paired) {
+        map<int, char>
+            unchecked_positions; // keys are ordered in ascending order
+        int x           = paired->first.first + 1;
+        int y           = paired->first.second + 1;
+        int maps_length = paired->second.size();
+
+        // sort the vector by second then first position in pair, ascendingly
+        // sort(paired->second.begin(), paired->second.end(), sort_by_second);
+        sort(paired->second.begin(), paired->second.end(),
+             sort_by_second_then_first);
+        unsigned int q_start = 0, q_end = 0, t_start = 0, t_end = 0;
 
         // vector of int to store aligned positions
         // every 4 ints: q_start, q_end, t_start, t_end
         // vector<int> alignments;
 
-        // iterate through all elements in a paired (x, y)
-        for (auto entry = paired->second.cbegin();
-             entry != paired->second.cend(); ++entry) {
-            int q_pos = entry->first, t_pos = entry->second;
+        /***************************
+         * rewriting the logic for connecting mapped elements between x and y
+         * new pipeline should work in worst case O(n^2), n is the maps_length
+         * 1. need to look at each possible start position (i.e., q_start,
+         * t_start) 1.2 starting from the start position, check all following
+         *          "unchecked" position to possibly expand q_end, t_end.
+         *      1.3 all positions used for expansion will be "checked" and
+         *          removed (i.e., won't be used as or in other start position)
+         * 2. repeat 1. until all possible start positions are checked
+         */
 
-            // initialization
-            if (q_start == -1) {
-                q_start = q_pos, q_end = q_pos;
-            }
-            if (t_start == -1) {
-                t_start = t_pos, t_end = t_pos;
-            }
+        // populate unchecked positions
+        for (int _i = 0; _i < maps_length; _i++) {
+            unchecked_positions.insert({_i, '.'});
+        }
 
-            // case 1 - X bp for search close one (combine together)
-            if (t_pos - t_end <= 2000) {
-                if (q_pos - q_end <= 2000) {
+        // while unchecked_positions still have items, continue searching
+        while (!unchecked_positions.empty()) {
+            // get the starting position and "check it out"
+            int start_pos = unchecked_positions.begin()->first;
+            unchecked_positions.erase(unchecked_positions.begin());
+
+            // initializing q_start, q_end, t_start, t_end
+            q_start = paired->second[start_pos].first;
+            q_end   = q_start;
+            t_start = paired->second[start_pos].second;
+            t_end   = t_start;
+
+            // loop over the unchecked positions to connect maps together
+            for (auto entry = unchecked_positions.begin();
+                 entry != unchecked_positions.end();
+                 /* no increment */) {
+                unsigned int q_pos = (paired->second[entry->first]).first;
+                unsigned int t_pos = (paired->second[entry->first]).second;
+
+                // if q_pos is close to q_end AND t_pos is close to t_end,
+                // then we extend both ends and "check out" the current index
+                if (((t_pos - t_end) <= search_range) &&
+                    ((q_pos - q_end) <= search_range)) {
                     q_end = q_pos;
                     t_end = t_pos;
-                } else {
-                    continue;
+                    unchecked_positions.erase(entry++);
                 }
-            } else {
-                // if next one is beyond range AND
-                // if length has exceeds 100 bp, append such alignment
-                // as true one
-                if ((t_end - t_start >= 100) && (q_end - q_start >= 100)) {
-                    /* 1.10.2023 - UPDATE to have an additional post-filtering
-                     * step. That is, run a global alignment between the mapped
-                     * region to see if the alignment identity is above a set
-                     * threshold, e.g., 60%. If yes then write to output.
-                     */
-                    filter_and_write(reports, id_threshold, x, y, q_start,
-                                     q_end, t_start, t_end);
-                    /* 1.10.2023 - UPDATE ends */
+                // if both q_pos/t_pos are out of reach, we can terminate the
+                // for-loop early since it is not possible for the following
+                // elements to connect
+                else if (((t_pos - t_end) > search_range) &&
+                         ((q_pos - q_end) > search_range)) {
+                    break;
+                }
+                // otherwise we continue searching
+                else {
+                    ++entry;
+                }
+            }
+            // cout << x << "," << y << ": " << q_start << " " << q_end << " "
+            // << t_start
+            //     << " " << t_end << endl;
 
-                    //reports << x << " " << y << " " << q_start << " " <<
-                    //    q_end << " " << t_start << " " << t_end << endl;
-                }
-                // reset alignment positions
-                q_start = q_pos, q_end = q_pos, t_start = t_pos, t_end = t_pos;
+            // now, add the connected map if it has length exceeds 100 bp
+            if (((t_end - t_start) >= map_len_thres) &&
+                ((q_end - q_start) >= map_len_thres)) {
+                filter_and_write(reports, id_threshold, x, y, q_start, q_end,
+                                 t_start, t_end);
             }
         }
-        // add in the last one checked if it exists
-        if (q_start != -1 && t_start != -1) {
-            if ((t_end - t_start >= 100) && (q_end - q_start >= 100)) {
-                filter_and_write(reports, id_threshold, x, y, q_start,
-                                 q_end, t_start, t_end);
-                //reports << x << " " << y << " " << q_start << " " << q_end
-                //        << " " << t_start << " " << t_end << endl;
-            }
-        }
+        /***************************/
+
+        //// iterate through all elements in a paired (x, y)
+        // for (auto entry = paired->second.cbegin();
+        //      entry != paired->second.cend(); ++entry) {
+        //     int q_pos = entry->first, t_pos = entry->second;
+
+        //    // initialization
+        //    if (q_start == -1) {
+        //        q_start = q_pos, q_end = q_pos;
+        //    }
+        //    if (t_start == -1) {
+        //        t_start = t_pos, t_end = t_pos;
+        //    }
+
+        //    // case 1 - X bp for search close one (combine together)
+        //    if (t_pos - t_end <= search_range && q_pos - q_end <=
+        //    search_range) {
+        //        q_end = q_pos;
+        //        t_end = t_pos;
+        //    } else {
+        //        // if next one is beyond range AND
+        //        // if length has exceeds 100 bp, append such alignment
+        //        // as true one
+        //        if ((t_end - t_start >= map_len_thres)
+        //                && (q_end - q_start >= map_len_thres)) {
+        //            /* 1.10.2023 - UPDATE to have an additional post-filtering
+        //             * step. That is, run a global alignment between the
+        //             mapped
+        //             * region to see if the alignment identity is above a set
+        //             * threshold, e.g., 60%. If yes then write to output.
+        //             */
+        //            filter_and_write(reports, id_threshold, x, y, q_start,
+        //                             q_end, t_start, t_end);
+        //            /* 1.10.2023 - UPDATE ends */
+
+        //            //reports << x << " " << y << " " << q_start << " " <<
+        //            //    q_end << " " << t_start << " " << t_end << endl;
+        //        }
+        //        // reset alignment positions
+        //        q_start = q_pos, q_end = q_pos, t_start = t_pos, t_end =
+        //        t_pos;
+        //    }
+        //}
+        //// add in the last one checked if it exists
+        // if (q_start != -1 && t_start != -1) {
+        //     if ((t_end - t_start >= map_len_thres)
+        //             && (q_end - q_start >= map_len_thres)) {
+        //         filter_and_write(reports, id_threshold, x, y, q_start,
+        //                          q_end, t_start, t_end);
+        //         //reports << x << " " << y << " " << q_start << " " << q_end
+        //         //        << " " << t_start << " " << t_end << endl;
+        //     }
+        // }
     }
     cend = Clock::now();
     t3   = chrono::duration_cast<chrono::milliseconds>(cend - cstart).count();
@@ -1345,11 +1451,13 @@ int main(int argc, char **argv) {
     int overall = t0 + t1 + t2 + t3;
 
     // all outputs
-    reports << add_threshold << "," << kill_threshold << "," << overall << ","
-            << t0 << "," << t1 << "," << t2 << "," << t3 << "," << total_p
-            << "," << total_px << "," << total_py << "," << total_q << ","
-            << num_bucket << "," << total_nodes << "," << xmer << "," << ymer
-            << endl;
+    reports << "align_multi=" << align_multi << ",id_threshold=" << id_threshold
+            << ",search_range=" << search_range
+            << ",map_len_thres=" << map_len_thres << "," << add_threshold << ","
+            << kill_threshold << "," << overall << "," << t0 << "," << t1 << ","
+            << t2 << "," << t3 << "," << total_p << "," << total_px << ","
+            << total_py << "," << total_q << "," << num_bucket << ","
+            << total_nodes << "," << xmer << "," << ymer << endl;
     reports.close();
     return 0;
 }
