@@ -446,9 +446,41 @@ tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
     }
 }
 
-// 1.10.2023 - post-process filtering with a global alignment to check
-// if the mapped query-target region is valid (e.g., alignment with identity
-// >= some threshold such as 60%)
+/**
+ * 1.13.2023 - post-process filtering by percentage shared kmers of a pair of mapped query-target
+ */
+double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, 
+                         int xend, int ystart, int yend) {
+    // use an unordered map to record the kmers of each vector
+    map<vector<char>, char> kmers;
+    map<vector<char>, char> shared_kmers;
+    double pct_shared = 0.0;
+    int l_kmer = 6;     // 6-mer
+
+    // iterate over x on its respective range
+    for (int i = xstart; i < xend - l_kmer + 1; i++) {
+        vector<char> x_subvec(&x[i], &x[i + l_kmer]);
+        kmers.emplace(x_subvec, 'x');
+    }
+    // iterate over y on its range and find the kmer in the map;
+    // 1. if it exists, shared_kmers++
+    // 2. else, w/e
+    for (int i = ystart; i < yend - l_kmer + 1; i++) {
+        vector<char> y_subvec(&y[i], &y[i + l_kmer]);
+        if (kmers.find(y_subvec) != kmers.end())
+            shared_kmers.emplace(y_subvec, 'y');
+        kmers.emplace(y_subvec, 'y');
+    }
+
+    pct_shared = ((double) shared_kmers.size()) / ((double) kmers.size());
+    return pct_shared;
+}
+
+/**
+ *  1.10.2023 - post-process filtering with a global alignment to check
+ *  if the mapped query-target region is valid (e.g., alignment with identity
+ *  >= some threshold such as 60%)
+ */
 void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
                       int q_start, int q_end, int t_start, int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
@@ -463,6 +495,7 @@ void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
     aln_score = get<0>(ret);
     start_idx = get<1>(ret);
     identity  = get<2>(ret);
+    //identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start, t_end);
 
     // if the alignment has >= id_threshold identity score, then we report it
     if (identity >= id_threshold) {
@@ -910,12 +943,12 @@ int main(int argc, char **argv) {
     string output_name       = "output.txt";
     string buckets_path      = "";
     string save_buckets_path = "";
-    double id_threshold      = 0.7;
+    double id_threshold      = 0.6;
     double add_threshold, kill_threshold;
-    double align_multi = 0.35;  // for pre-filtering alignment
+    double align_multi = 0.3;  // for pre-filtering alignment
     int range         = 9;      // pre-filtering alignment length
     int search_range  = 300;    // maximum gap for connecting two maps
-    int map_len_thres = 300;    // minimum alignment length to report
+    int map_len_thres = 200;    // minimum alignment length to report
     int verbose       = 0;
     bool save_buckets = false;  // whether to save buckets info for current run
     bool read_buckets = false;  // whether to use preexisting buckets
