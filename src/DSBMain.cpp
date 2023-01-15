@@ -447,15 +447,16 @@ tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
 }
 
 /**
- * 1.13.2023 - post-process filtering by percentage shared kmers of a pair of mapped query-target
+ * 1.13.2023 - post-process filtering by percentage shared kmers of a pair of
+ * mapped query-target
  */
-double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, 
-                         int xend, int ystart, int yend) {
+double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
+                        int ystart, int yend) {
     // use an unordered map to record the kmers of each vector
     map<vector<char>, char> kmers;
     map<vector<char>, char> shared_kmers;
     double pct_shared = 0.0;
-    int l_kmer = 6;     // 6-mer
+    int l_kmer        = 6; // 6-mer
 
     // iterate over x on its respective range
     for (int i = xstart; i < xend - l_kmer + 1; i++) {
@@ -472,7 +473,7 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart,
         kmers.emplace(y_subvec, 'y');
     }
 
-    pct_shared = ((double) shared_kmers.size()) / ((double) kmers.size());
+    pct_shared = ((double)shared_kmers.size()) / ((double)kmers.size());
     return pct_shared;
 }
 
@@ -481,7 +482,8 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart,
  *  if the mapped query-target region is valid (e.g., alignment with identity
  *  >= some threshold such as 60%)
  */
-void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
+bool filter_and_write(ofstream &reports, bool b_alignment,
+                      double id_threshold, int q, int t,
                       int q_start, int q_end, int t_start, int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
     double identity = 0.0;
@@ -490,22 +492,31 @@ void filter_and_write(ofstream &reports, double id_threshold, int q, int t,
 
     // compute an alignment between query q and target t, in the respectively
     // mapped region q[q_start:q_end] and t[t_start:t_end]
-    auto ret  = alignment(X[q - 1], Y[t - 1], q_start, t_start, q_end - q_start,
-                          t_end - t_start, true);
-    aln_score = get<0>(ret);
-    start_idx = get<1>(ret);
-    identity  = get<2>(ret);
-    //identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start, t_end);
+    if (b_alignment) {
+        auto ret  = alignment(X[q - 1], Y[t - 1], q_start, t_start, q_end - q_start,
+                              t_end - t_start, true);
+        aln_score = get<0>(ret);
+        start_idx = get<1>(ret);
+        identity  = get<2>(ret);
+        // identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start,
+        // t_end);
+    } else {
+        // compute shared pct shared kmers
+        identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end,
+                t_start, t_end);
+    }
+
 
     // if the alignment has >= id_threshold identity score, then we report it
     if (identity >= id_threshold) {
         reports << q << " " << t << " " << q_start << " " << q_end << " "
                 << t_start << " " << t_end << " "
                 << round(100 * identity / 0.01) * 0.01 << endl;
+        return true;
         //<< " " << aln_result->aln_x
         //<< " " << aln_result->aln_y << endl;
     }
-
+    return false;
     // delete aln_result;
 }
 
@@ -943,15 +954,18 @@ int main(int argc, char **argv) {
     string output_name       = "output.txt";
     string buckets_path      = "";
     string save_buckets_path = "";
-    double id_threshold      = 0.6;
+    double id_threshold      = 0.7;
+    double kmer_threshold    = 0.25;
     double add_threshold, kill_threshold;
-    double align_multi = 0.3;  // for pre-filtering alignment
-    int range         = 9;      // pre-filtering alignment length
-    int search_range  = 300;    // maximum gap for connecting two maps
-    int map_len_thres = 200;    // minimum alignment length to report
-    int verbose       = 0;
-    bool save_buckets = false;  // whether to save buckets info for current run
-    bool read_buckets = false;  // whether to use preexisting buckets
+    double align_multi = 0.3; // for pre-filtering alignment
+    int range          = 9;   // pre-filtering alignment length
+    int search_range   = 300; // maximum gap for connecting two maps
+    int map_len_thres  = 200; // minimum alignment length to report
+    int long_len_thres  = 1000; // alignment above this will be checked with
+                                // % shared 6-kmers
+    int verbose        = 0;
+    bool save_buckets  = false; // whether to save buckets info for current run
+    bool read_buckets  = false; // whether to use preexisting buckets
 
     // argument parsing
     int error_flag = 0;
@@ -1314,6 +1328,8 @@ int main(int argc, char **argv) {
     cerr << "Mapping and writing results in buckets... ";
     cstart = Clock::now();
     reports.open(output_name, ofstream::out);
+    unsigned int num_passed_filter = 0, num_checked = 0;
+    unsigned int num_passed_kmers = 0, num_checked_kmers = 0;
 
     /////////// TEMP output to see what are the mapped pairs
     // for (auto paired = results.begin(); paired != results.end(); ++paired) {
@@ -1359,7 +1375,9 @@ int main(int argc, char **argv) {
         // while unchecked_positions still have items, continue searching
         while (!unchecked_positions.empty()) {
             // get the starting position and "check it out"
-            int start_pos = unchecked_positions.begin()->first;
+            int start_pos          = unchecked_positions.begin()->first;
+            double pct_shared_kmer = 0.0;
+            bool passed;
             unchecked_positions.erase(unchecked_positions.begin());
 
             // initializing q_start, q_end, t_start, t_end
@@ -1402,8 +1420,23 @@ int main(int argc, char **argv) {
             // now, add the connected map if it has length exceeds 100 bp
             if (((t_end - t_start) >= map_len_thres) &&
                 ((q_end - q_start) >= map_len_thres)) {
-                filter_and_write(reports, id_threshold, x, y, q_start, q_end,
-                                 t_start, t_end);
+                // if long mapping (e.g., > 1000 bp), do shared kmer filtering
+                if ((t_end - t_start >= long_len_thres) || 
+                    (q_end - q_start >= long_len_thres)) {
+                    passed = filter_and_write(reports, false, kmer_threshold,
+                            x, y, q_start, q_end, t_start, t_end);
+                    num_checked_kmers++;
+                    if (passed) num_passed_kmers++;
+                } else {
+                    passed = filter_and_write(reports, true, id_threshold, x, y,
+                                              q_start, q_end, t_start, t_end);
+                    num_checked++;
+                    if (passed) num_passed_filter++;
+                }
+                // else
+                //     cerr << x << "," << y << "," << q_start << ","
+                //         << q_end << "," << t_start << "," << t_end
+                //         << " --> " << shared_kmer << endl;
             }
         }
         /***************************/
@@ -1484,13 +1517,21 @@ int main(int argc, char **argv) {
     int overall = t0 + t1 + t2 + t3;
 
     // all outputs
-    reports << "align_multi=" << align_multi << ",id_threshold=" << id_threshold
-            << ",search_range=" << search_range
-            << ",map_len_thres=" << map_len_thres << "," << add_threshold << ","
-            << kill_threshold << "," << overall << "," << t0 << "," << t1 << ","
-            << t2 << "," << t3 << "," << total_p << "," << total_px << ","
-            << total_py << "," << total_q << "," << num_bucket << ","
-            << total_nodes << "," << xmer << "," << ymer << endl;
+    reports << "align_multi=" << align_multi << ","
+            << "id_threshold=" << id_threshold << ","
+            << "kmer_threshold=" << kmer_threshold << ","
+            << "search_range=" << search_range << ","
+            << "map_len_thres=" << map_len_thres << ","
+            << "long_len_thres=" << long_len_thres << ","
+            << "num_checked_alignment=" << num_checked << ","
+            << "num_passed_alignment=" << num_passed_filter << ","
+            << "num_checked_kmers=" << num_checked_kmers << ","
+            << "num_passed_kmers=" << num_passed_kmers << ","
+            << add_threshold << "," << kill_threshold << "," << overall << ","
+            << t0 << "," << t1 << "," << t2 << "," << t3 << "," << total_p
+            << "," << total_px << "," << total_py << "," << total_q << ","
+            << num_bucket << "," << total_nodes << "," << xmer << "," << ymer
+            << endl;
     reports.close();
     return 0;
 }
