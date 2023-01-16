@@ -25,6 +25,10 @@
 #include <unordered_map>
 #include <vector>
 
+#define no_argument 0
+#define required_argument 1
+#define optional_argument 2
+
 using namespace std;
 typedef chrono::high_resolution_clock Clock;
 
@@ -482,9 +486,9 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
  *  if the mapped query-target region is valid (e.g., alignment with identity
  *  >= some threshold such as 60%)
  */
-bool filter_and_write(ofstream &reports, bool b_alignment,
-                      double id_threshold, int q, int t,
-                      int q_start, int q_end, int t_start, int t_end) {
+bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
+                      int q, int t, int q_start, int q_end, int t_start,
+                      int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
     double identity = 0.0;
     int aln_score   = 0;
@@ -493,19 +497,18 @@ bool filter_and_write(ofstream &reports, bool b_alignment,
     // compute an alignment between query q and target t, in the respectively
     // mapped region q[q_start:q_end] and t[t_start:t_end]
     if (b_alignment) {
-        auto ret  = alignment(X[q - 1], Y[t - 1], q_start, t_start, q_end - q_start,
-                              t_end - t_start, true);
+        auto ret  = alignment(X[q - 1], Y[t - 1], q_start, t_start,
+                              q_end - q_start, t_end - t_start, true);
         aln_score = get<0>(ret);
         start_idx = get<1>(ret);
         identity  = get<2>(ret);
-        // identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start,
-        // t_end);
+        // identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end,
+        // t_start, t_end);
     } else {
         // compute shared pct shared kmers
-        identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end,
-                t_start, t_end);
+        identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start,
+                                    t_end);
     }
-
 
     // if the alignment has >= id_threshold identity score, then we report it
     if (identity >= id_threshold) {
@@ -525,7 +528,8 @@ void print_helper() {
     printf("Usage: ./DSBMain -q [query file] -r [reference file] -i [insertion "
            "rate] -d "
            "[deletion rate] -m [mutation rate] -a [add threshold] "
-           "-k [kill threshold] -o [name] {-vh}\n\n");
+           "-k [kill threshold] -o [name] -A [alignment threshold] -K [kmer "
+           "threshold] {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
     printf("\nModel:\n");
     printf("-i [0<=i<1]\tInsertion rate.\n");
@@ -534,12 +538,18 @@ void print_helper() {
            "happens.\n");
     printf("-a [a>0]\tThreshold for a node to be considered a bucket.\n");
     printf("-k [k>0]\tThreshold for a node to be pruned.\n");
+    printf(
+        "-A or --alignment_threshold [0<=A<=1]\n\t\tThreshold for filtering maps "
+        "with global alignment (default: 0.7).\n");
+    printf(
+        "-K or --kmer_threshold [0<=K<=1]\n\t\tThreshold for filtering maps with "
+        "percentage shared kmers (default: 0.25).\n");
     printf("-b [path]\tIf specified, will use the given buckets file produced "
            "from a previously curated run\n");
     printf("-s [path]\tInclude this option to save buckets from this run to "
            "local [path]. Disabled if '-b' is specified\n");
     printf("\nOther settings:\n");
-    printf("-v\t\tVerbose mode.\n");
+    printf("-v or --verbose\tVerbose mode.\n");
     printf("-o [name]\tSpecify output file name.\n");
     printf("-q [path/to/q]\tPath to the query file.\n");
     printf("-r [path/to/r]\tPath to the reference file.\n\n");
@@ -957,23 +967,36 @@ int main(int argc, char **argv) {
     double id_threshold      = 0.7;
     double kmer_threshold    = 0.25;
     double add_threshold, kill_threshold;
-    double align_multi = 0.3; // for pre-filtering alignment
-    int range          = 9;   // pre-filtering alignment length
-    int search_range   = 300; // maximum gap for connecting two maps
-    int map_len_thres  = 200; // minimum alignment length to report
-    int long_len_thres  = 1000; // alignment above this will be checked with
-                                // % shared 6-kmers
-    int verbose        = 0;
-    bool save_buckets  = false; // whether to save buckets info for current run
-    bool read_buckets  = false; // whether to use preexisting buckets
+    double align_multi = 0.3;  // for pre-filtering alignment
+    int range          = 9;    // pre-filtering alignment length
+    int search_range   = 300;  // maximum gap for connecting two maps
+    int map_len_thres  = 200;  // minimum alignment length to report
+    int long_len_thres = 1000; // alignment above this will be checked with
+                               // % shared 6-kmers
+    int verbose       = 0;
+    bool save_buckets = false; // whether to save buckets info for current run
+    bool read_buckets = false; // whether to use preexisting buckets
 
     // argument parsing
     int error_flag = 0;
     // int error_flag =
     //    !(argc == 15 || argc == 16 || argc == 17 || argc == 18 || argc == 19);
-    char opt;
-    while ((opt = getopt(argc, argv, "hvr:q:i:d:m:a:k:o:b:s:")) != -1) {
+    int opt_ind;
+    int opt;
+    const struct option longopts[] = {
+        {"alignment_threshold", required_argument, 0, 'A'},
+        {"kmer_threshold", required_argument, 0, 'K'},
+        {"verbose", no_argument, 0, 'v'},
+        {0, 0, 0, 0}};
+
+    int arg_long;
+    while ((opt = getopt_long(argc, argv, "hvr:q:i:d:m:a:k:o:b:s:A:K:",
+                              longopts, &opt_ind)) != -1) {
         switch (opt) {
+        // long options
+        case 0:
+            cout << "Long option: " << longopts[opt_ind].name << endl;
+            break;
         case 'q': // X datafile address
             xfile = optarg;
             break;
@@ -996,6 +1019,12 @@ int main(int argc, char **argv) {
         case 'k': // threshold 2 - for a node to be pruned
             kill_threshold = atof(optarg);
             break;
+        case 'A':
+            id_threshold = min(1.0, atof(optarg));
+            break;
+        case 'K':
+            kmer_threshold = min(1.0, atof(optarg));
+            break;
         case 'v': // verbose mode
             verbose = 1;
             break;
@@ -1013,6 +1042,8 @@ int main(int argc, char **argv) {
         case 'h': // print all needed arguments
             print_helper();
             exit(0);
+        case '?':
+            break;
         default:
             error_flag = 1;
             break;
@@ -1051,15 +1082,16 @@ int main(int argc, char **argv) {
     }
 
     p_match = 1.0 - p_ins - p_del;
-
     if (verbose) {
         printf("X: %s\tY: %s\nOutput: %s\n\tUse buckets: %d\tPath: %s\n\tSave "
-               "buckets: %d\tPath: %s\nInsertion: %.3f\tDeletion: "
-               "%.3f\t\tMutation: "
-               "%.3f\nThreshold 1: %.1f\tThreshold 2: %.1f\n\n",
+               "buckets: %d\tPath: %s\nInsertion: %.3f\tDeletion: %.3f"
+               "\t\tMutation: %.3f"
+               "\nThreshold 1: %.1f\tThreshold 2: %.1f"
+               "\nAlignment threshold: %.2f\tKmer threshold: %.2f\n\n",
                xfile.c_str(), yfile.c_str(), output_name.c_str(), read_buckets,
                buckets_path.c_str(), save_buckets, save_buckets_path.c_str(),
-               p_ins, p_del, eps * 12, add_threshold, kill_threshold);
+               p_ins, p_del, eps * 12, add_threshold, kill_threshold,
+               id_threshold, kmer_threshold);
     }
 
     // call function to read in data
@@ -1421,17 +1453,20 @@ int main(int argc, char **argv) {
             if (((t_end - t_start) >= map_len_thres) &&
                 ((q_end - q_start) >= map_len_thres)) {
                 // if long mapping (e.g., > 1000 bp), do shared kmer filtering
-                if ((t_end - t_start >= long_len_thres) || 
+                if ((t_end - t_start >= long_len_thres) ||
                     (q_end - q_start >= long_len_thres)) {
-                    passed = filter_and_write(reports, false, kmer_threshold,
-                            x, y, q_start, q_end, t_start, t_end);
+                    passed =
+                        filter_and_write(reports, false, kmer_threshold, x, y,
+                                         q_start, q_end, t_start, t_end);
                     num_checked_kmers++;
-                    if (passed) num_passed_kmers++;
+                    if (passed)
+                        num_passed_kmers++;
                 } else {
                     passed = filter_and_write(reports, true, id_threshold, x, y,
                                               q_start, q_end, t_start, t_end);
                     num_checked++;
-                    if (passed) num_passed_filter++;
+                    if (passed)
+                        num_passed_filter++;
                 }
                 // else
                 //     cerr << x << "," << y << "," << q_start << ","
@@ -1526,12 +1561,11 @@ int main(int argc, char **argv) {
             << "num_checked_alignment=" << num_checked << ","
             << "num_passed_alignment=" << num_passed_filter << ","
             << "num_checked_kmers=" << num_checked_kmers << ","
-            << "num_passed_kmers=" << num_passed_kmers << ","
-            << add_threshold << "," << kill_threshold << "," << overall << ","
-            << t0 << "," << t1 << "," << t2 << "," << t3 << "," << total_p
-            << "," << total_px << "," << total_py << "," << total_q << ","
-            << num_bucket << "," << total_nodes << "," << xmer << "," << ymer
-            << endl;
+            << "num_passed_kmers=" << num_passed_kmers << "," << add_threshold
+            << "," << kill_threshold << "," << overall << "," << t0 << "," << t1
+            << "," << t2 << "," << t3 << "," << total_p << "," << total_px
+            << "," << total_py << "," << total_q << "," << num_bucket << ","
+            << total_nodes << "," << xmer << "," << ymer << endl;
     reports.close();
     return 0;
 }
