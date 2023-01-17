@@ -29,6 +29,17 @@
 #define required_argument 1
 #define optional_argument 2
 
+// penalties for alignment
+#define s_indel -1
+#define s_match 1
+#define s_mismatch -1
+
+// evalue constants
+#define e_value_k 0.711
+#define e_value_lambda 0.37
+//#define e_value_lambda 1.37
+#define e_value_threshold 1e-20
+
 using namespace std;
 typedef chrono::high_resolution_clock Clock;
 
@@ -240,11 +251,6 @@ static double p_ins   = -1.;
 static double p_del   = -1.;
 static double p_match = -1.;
 
-// penalties for alignment
-static const int s_indel    = -1;
-static const int s_match    = 1;
-static const int s_mismatch = -1;
-
 // method to read in data from given files X and Y
 // we are using real data for this one, so it is modified
 // FOR {A,T,C,G} DNA alignment
@@ -311,16 +317,26 @@ void readData(string xfile, string yfile) {
     data_y.close();
 }
 
+// compute an alignment e-value
+double calc_e_value(int m, int n, int aln_score) {
+    // equation: E = K * m * n *e^{-\lambda * S}
+    double bitscore = (e_value_lambda * aln_score - log(e_value_k)) / log(2);
+    double E        = m * n * exp(-bitscore);
+    return E;
+}
+
 // alignment method for comparing two given data points
 // tuple<int, int, double, vector<char>*, vector<char>*>
-tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
-                                  int ystart, int xrange, int yrange,
-                                  bool b_backtrace) {
+tuple<int, int, double, double> alignment(vector<char> &x, vector<char> &y,
+                                          int xstart, int ystart, int xrange,
+                                          int yrange, bool b_backtrace) {
     // alnresult * aln_result = new alnresult();
     //  rows are x, columns are y
+    double identity = 0.0; // identity score of the alignment
+    double e_value  = 0.0; // e value of the alignment
     int xend        = 0;
     int yend        = 0;
-    double identity = 0.0; // identity score of alignment
+    int aln_score   = 0; // alignment score
 
     if (xrange != -1 && yrange != -1) {
         xend = min(xstart + xrange + 1, int(x.size() + 1));
@@ -370,6 +386,7 @@ tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
             }
         }
     }
+    aln_score = matrix[xend - xstart - 1][yend - ystart - 1];
 
     // reconstruct the alignment if backtracing
     if (b_backtrace) {
@@ -434,6 +451,8 @@ tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
                 tmp_y[ypos--] = '-';
         }
         identity = ((double)(exact_match)) / ((double)aln_len);
+        // compute e-value of the alignment
+        e_value = calc_e_value(x.size(), y.size(), aln_score);
 
         // get the start of the alignment (i.e., identify the first index where
         // at least one of tmp_x/tmp_y has a character)
@@ -443,10 +462,12 @@ tuple<int, int, double> alignment(vector<char> &x, vector<char> &y, int xstart,
                 break;
             }
         }
+
         return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1],
-                          start_idx, identity);
+                          start_idx, identity, e_value);
     } else {
-        return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1], 0, 0.0);
+        return make_tuple(matrix[xend - xstart - 1][yend - ystart - 1], 0, 0.0,
+                          e_value);
     }
 }
 
@@ -462,17 +483,21 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
     double pct_shared = 0.0;
     int l_kmer        = 6; // 6-mer
 
+    // failsafe for wrong sizes
+    if ((xend - xstart) <= 0 || (yend - ystart) <= 0) return pct_shared;
+
     // iterate over x on its respective range
     for (int i = xstart; i < xend - l_kmer + 1; i++) {
         vector<char> x_subvec(&x[i], &x[i + l_kmer]);
         kmers.emplace(x_subvec, 'x');
     }
+
     // iterate over y on its range and find the kmer in the map;
     // 1. if it exists, shared_kmers++
     // 2. else, w/e
     for (int i = ystart; i < yend - l_kmer + 1; i++) {
         vector<char> y_subvec(&y[i], &y[i + l_kmer]);
-        if (kmers.find(y_subvec) != kmers.end())
+        if (kmers.find(y_subvec) != kmers.end() && kmers[y_subvec] == 'x')
             shared_kmers.emplace(y_subvec, 'y');
         kmers.emplace(y_subvec, 'y');
     }
@@ -486,14 +511,13 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
  *  if the mapped query-target region is valid (e.g., alignment with identity
  *  >= some threshold such as 60%)
  */
-bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
-                      int q, int t, int q_start, int q_end, int t_start,
-                      int t_end) {
+bool filter_and_write(ofstream &reports, bool b_alignment, double threshold,
+                  int q, int t, int q_start, int q_end, int t_start,
+                  int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
-    char *ftype;
-    double identity = 0.0;
-    int aln_score   = 0;
-    int start_idx   = 0;
+    double metric = 0.0, e_value = 0.0;
+    int aln_score = 0;
+    int start_idx = 0;
 
     // compute an alignment between query q and target t, in the respectively
     // mapped region q[q_start:q_end] and t[t_start:t_end]
@@ -502,30 +526,29 @@ bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
                               q_end - q_start, t_end - t_start, true);
         aln_score = get<0>(ret);
         start_idx = get<1>(ret);
-        identity  = get<2>(ret);
-        // identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end,
-        // t_start, t_end);
+        metric  = get<2>(ret); // alignment identity
+        e_value   = get<3>(ret); // alignment e-value
     } else {
         // compute shared pct shared kmers
-        identity = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start,
-                                    t_end);
+        metric = pct_shared_kmers(X[q - 1], Y[t - 1], q_start, q_end, t_start,
+                                  t_end);
     }
 
     // if the alignment has >= id_threshold identity score, then we report it
-    if (identity >= id_threshold) {
+    if (b_alignment && e_value <= e_value_threshold && metric >= threshold) {
         reports << q << " " << t << " " << q_start << " " << q_end << " "
                 << t_start << " " << t_end << " "
-                << round(100 * identity / 0.01) * 0.01;
-        if (b_alignment)
-            reports << " ALIGNMENT_ID" << endl;
-        else
-            reports << " PCT_SHARED_KMER" << endl;
+                << round(100 * metric / 0.01) * 0.01 << " " << e_value
+                << " ALIGNMENT" << endl;
         return true;
-        //<< " " << aln_result->aln_x
-        //<< " " << aln_result->aln_y << endl;
+    } else if (!b_alignment && metric >= threshold) {
+        reports << q << " " << t << " " << q_start << " " << q_end << " "
+                << t_start << " " << t_end << " "
+                << round(100 * metric / 0.01) * 0.01 << " nan"
+                << " PCT_SHARED_KMER" << endl;
+        return true;
     }
     return false;
-    // delete aln_result;
 }
 
 // function to print needed arguments/documentation for this program
@@ -1363,12 +1386,8 @@ int main(int argc, char **argv) {
                     ++entry;
                 }
             }
-            // cout << x << "," << y << ": " << q_start << " " << q_end << " "
-            // << t_start
-            //     << " " << t_end << endl;
-
             // now, add the connected map if it has length exceeds X bp
-            if (((t_end - t_start) >= map_len_thres) ||
+            if (((t_end - t_start) >= map_len_thres) && 
                 ((q_end - q_start) >= map_len_thres)) {
                 // if long mapping (e.g., > 1000 bp), do shared kmer filtering
                 if ((t_end - t_start >= long_len_thres) ||
@@ -1380,16 +1399,14 @@ int main(int argc, char **argv) {
                     if (passed)
                         num_passed_kmers++;
                 } else {
-                    passed = filter_and_write(reports, true, id_threshold, x, y,
-                                              q_start, q_end, t_start, t_end);
+                    // use e-value for filtering alignment
+                    passed =
+                        filter_and_write(reports, true, id_threshold, x, y,
+                                         q_start, q_end, t_start, t_end);
                     num_checked++;
                     if (passed)
                         num_passed_filter++;
                 }
-                // else
-                //     cerr << x << "," << y << "," << q_start << ","
-                //         << q_end << "," << t_start << "," << t_end
-                //         << " --> " << shared_kmer << endl;
             }
         }
         /***************************/
