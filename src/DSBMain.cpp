@@ -490,6 +490,7 @@ bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
                       int q, int t, int q_start, int q_end, int t_start,
                       int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
+    char *ftype;
     double identity = 0.0;
     int aln_score   = 0;
     int start_idx   = 0;
@@ -514,7 +515,11 @@ bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
     if (identity >= id_threshold) {
         reports << q << " " << t << " " << q_start << " " << q_end << " "
                 << t_start << " " << t_end << " "
-                << round(100 * identity / 0.01) * 0.01 << endl;
+                << round(100 * identity / 0.01) * 0.01;
+        if (b_alignment)
+            reports << " ALIGNMENT_ID" << endl;
+        else
+            reports << " PCT_SHARED_KMER" << endl;
         return true;
         //<< " " << aln_result->aln_x
         //<< " " << aln_result->aln_y << endl;
@@ -1098,12 +1103,15 @@ int main(int argc, char **argv) {
         printf("X: %s\tY: %s\nOutput: %s\n\tUse buckets: %d\tPath: %s\n\tSave "
                "buckets: %d\tPath: %s\nInsertion: %.3f\tDeletion: %.3f"
                "\t\tMutation: %.3f"
-               "\nThreshold 1: %.1f\tThreshold 2: %.1f"
+               "\nThreshold 1: %.1f\t\tThreshold 2: %.1f"
+               "\nMinimum map length (bp): %d\tMinimum map length (bp) to "
+               "use %% kmer "
+               "filter: %d"
                "\nAlignment threshold: %.2f\tKmer threshold: %.2f\n\n",
                xfile.c_str(), yfile.c_str(), output_name.c_str(), read_buckets,
                buckets_path.c_str(), save_buckets, save_buckets_path.c_str(),
                p_ins, p_del, eps * 12, add_threshold, kill_threshold,
-               id_threshold, kmer_threshold);
+               map_len_thres, long_len_thres, id_threshold, kmer_threshold);
     }
 
     // call function to read in data
