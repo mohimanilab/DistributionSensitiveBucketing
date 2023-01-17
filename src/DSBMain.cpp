@@ -544,6 +544,8 @@ void print_helper() {
     printf(
         "-K or --kmer_threshold [0<=K<=1]\n\t\tThreshold for filtering maps with "
         "percentage shared kmers (default: 0.25).\n");
+    printf(
+        "-M or --min_map_length [M>0]\n\t\tMinimum reported map length (default: 250bp).\n");
     printf("-b [path]\tIf specified, will use the given buckets file produced "
            "from a previously curated run\n");
     printf("-s [path]\tInclude this option to save buckets from this run to "
@@ -970,7 +972,7 @@ int main(int argc, char **argv) {
     double align_multi = 0.3;  // for pre-filtering alignment
     int range          = 9;    // pre-filtering alignment length
     int search_range   = 300;  // maximum gap for connecting two maps
-    int map_len_thres  = 200;  // minimum alignment length to report
+    int map_len_thres  = 250;  // minimum alignment length to report
     int long_len_thres = 1000; // alignment above this will be checked with
                                // % shared 6-kmers
     int verbose       = 0;
@@ -986,6 +988,7 @@ int main(int argc, char **argv) {
     const struct option longopts[] = {
         {"alignment_threshold", required_argument, 0, 'A'},
         {"kmer_threshold", required_argument, 0, 'K'},
+        {"map_length_threshold", required_argument, 0, 'M'},
         {"verbose", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
 
@@ -995,7 +998,6 @@ int main(int argc, char **argv) {
         switch (opt) {
         // long options
         case 0:
-            cout << "Long option: " << longopts[opt_ind].name << endl;
             break;
         case 'q': // X datafile address
             xfile = optarg;
@@ -1024,6 +1026,9 @@ int main(int argc, char **argv) {
             break;
         case 'K':
             kmer_threshold = min(1.0, atof(optarg));
+            break;
+        case 'M':
+            map_len_thres = max(1, atoi(optarg));
             break;
         case 'v': // verbose mode
             verbose = 1;
@@ -1268,83 +1273,31 @@ int main(int argc, char **argv) {
                     continue;
                 // check alignment score (post-processing)
                 int align_score       = 0;
-                int aligned_i         = 0;
-                int aligned_j         = 0;
                 pair<int, int> cur_xy = make_pair(xit->first, yit->first);
                 // pair<int, int> cur_mapped_low = make_pair(-range, -range);
 
                 for (int i = 0; i < xit->second.size(); i++) {
                     for (int j = 0; j < yit->second.size(); j++) {
-                        // if the current map point of (x,y) has been covered
-                        // by previous alignment, then skip
-                        // if (((cur_mapped_low.first + range) >=
-                        //         xit->second[i] &&
-                        //     cur_mapped_low.first < xit->second[i]) ||
-                        //    ((cur_mapped_low.second + range) >=
-                        //         yit->second[j] &&
-                        //     cur_mapped_low.second < yit->second[j])) {
-                        //    continue;
-                        //}
-
                         // 1.30.2023 - since I changed the alignment function
                         // the returned item also include the actual alignment
                         // TESTING OUT its impact on performance
-                        // pair<int, int> val = make_pair(xit->second[i],
-                        //        yit->second[j]);
-                        // results[cur_xy].push_back(val);
+                        //pair<int, int> val = make_pair(xit->second[i],
+                        //       yit->second[j]);
+                        //results[cur_xy].push_back(val);
                         auto ret    = alignment(X[xit->first], Y[yit->first],
                                                 xit->second[i], yit->second[j],
                                                 range, range, false);
                         align_score = get<0>(ret);
-                        // align_score = max(align_score, get<0>(ret));
-                        //  align_score = max(
-                        //      align_score,
-                        //      alignment(X[xit->first], Y[yit->first],
-                        //                xit->second[i], yit->second[j],
-                        //                range, range, false));
 
                         // if alignment score is good, then end the loop
                         if (align_score >= align_thres) {
-                            aligned_i = i;
-                            aligned_j = j;
-                            // goto endloop;
-                            /* 1.12.2023 - do not end the loop but search
-                             * through all pairs (can be slow but let's see) to
-                             * avoid not finding all possible pairs
-                             */
                             pair<int, int> val;
                             // key = make_pair(xit->first, yit->first);
                             val = make_pair(xit->second[i], yit->second[j]);
                             results[cur_xy].push_back(val);
-
-                            //// update low end of the cur_mapped_low
-                            // pair<int, int> cur_low = cur_mapped_low[cur_xy];
-                            // cur_mapped_low[cur_xy] =
-                            //     make_pair(max(cur_low.first, xit->second[i]),
-                            //               max(cur_low.second,
-                            //               yit->second[j]));
                         }
                     }
                 }
-                // endloop:
-                //     if (align_score >= align_thres) {
-                //         pair<int, int> val;
-                //         // key = make_pair(xit->first, yit->first);
-                //         val = make_pair(xit->second[aligned_i],
-                //                         yit->second[aligned_j]);
-                //         results[cur_xy].push_back(val);
-
-                //        // update low end of the cur_mapped_low
-                //        pair<int, int> cur_low = cur_mapped_low[cur_xy];
-                //        cur_mapped_low[cur_xy] =
-                //            make_pair(max(cur_low.first,
-                //            xit->second[aligned_i]),
-                //                      max(cur_low.second,
-                //                      yit->second[aligned_j]));
-                //    }
-
-                //    // reports << xit->first << ":" << xit->second << ";"
-                //    //    << yit->first << ":" << yit->second << endl;
             }
         }
         xmer += (*it)->x.size();
@@ -1449,8 +1402,8 @@ int main(int argc, char **argv) {
             // << t_start
             //     << " " << t_end << endl;
 
-            // now, add the connected map if it has length exceeds 100 bp
-            if (((t_end - t_start) >= map_len_thres) &&
+            // now, add the connected map if it has length exceeds X bp
+            if (((t_end - t_start) >= map_len_thres) ||
                 ((q_end - q_start) >= map_len_thres)) {
                 // if long mapping (e.g., > 1000 bp), do shared kmer filtering
                 if ((t_end - t_start >= long_len_thres) ||
