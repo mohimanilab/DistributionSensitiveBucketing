@@ -525,11 +525,12 @@ bool filter_and_write(ofstream &reports, bool b_alignment, double id_threshold,
 
 // function to print needed arguments/documentation for this program
 void print_helper() {
-    printf("Usage: ./DSBMain -q [query file] -r [reference file] -i [insertion "
-           "rate] -d "
-           "[deletion rate] -m [mutation rate] -a [add threshold] "
-           "-k [kill threshold] -o [name] -A [alignment threshold] -K [kmer "
-           "threshold] {-vh}\n\n");
+    printf(
+        "Usage: ./DSBMain -q [query file] -r [reference file] -i [insertion "
+        "rate] -d "
+        "[deletion rate] -m [mutation rate] -a [add threshold] "
+        "-k [kill threshold] -o [name] -A [alignment threshold] -K [kmer "
+        "threshold] -M [min map length] -L [kmer filter threshold] {-vh}\n\n");
     printf("-h\t\tPrint this block of information.\n");
     printf("\nModel:\n");
     printf("-i [0<=i<1]\tInsertion rate.\n");
@@ -538,14 +539,16 @@ void print_helper() {
            "happens.\n");
     printf("-a [a>0]\tThreshold for a node to be considered a bucket.\n");
     printf("-k [k>0]\tThreshold for a node to be pruned.\n");
-    printf(
-        "-A or --alignment_threshold [0<=A<=1]\n\t\tThreshold for filtering maps "
-        "with global alignment (default: 0.7).\n");
-    printf(
-        "-K or --kmer_threshold [0<=K<=1]\n\t\tThreshold for filtering maps with "
-        "percentage shared kmers (default: 0.25).\n");
-    printf(
-        "-M or --min_map_length [M>0]\n\t\tMinimum reported map length (default: 250bp).\n");
+    printf("-A or --alignment_threshold [0<=A<=1]\n\t\tThreshold for filtering "
+           "maps "
+           "with global alignment (default: 0.7).\n");
+    printf("-K or --kmer_threshold [0<=K<=1]\n\t\tThreshold for filtering maps "
+           "with "
+           "percentage shared kmers (default: 0.25).\n");
+    printf("-M or --min_map_length [M>0]\n\t\tMinimum reported map length "
+           "(default: 250bp).\n");
+    printf("-L or --long_threshold [L>M]\n\t\tLower bound map length to start "
+           "using shared kmer for filtering (default: 1000bp).\n");
     printf("-b [path]\tIf specified, will use the given buckets file produced "
            "from a previously curated run\n");
     printf("-s [path]\tInclude this option to save buckets from this run to "
@@ -988,12 +991,13 @@ int main(int argc, char **argv) {
     const struct option longopts[] = {
         {"alignment_threshold", required_argument, 0, 'A'},
         {"kmer_threshold", required_argument, 0, 'K'},
-        {"map_length_threshold", required_argument, 0, 'M'},
+        {"min_map_length", required_argument, 0, 'M'},
+        {"long_length_threshold", required_argument, 0, 'L'},
         {"verbose", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
 
     int arg_long;
-    while ((opt = getopt_long(argc, argv, "hvr:q:i:d:m:a:k:o:b:s:A:K:",
+    while ((opt = getopt_long(argc, argv, "hvr:q:i:d:m:a:k:o:b:s:A:K:M:L:",
                               longopts, &opt_ind)) != -1) {
         switch (opt) {
         // long options
@@ -1029,6 +1033,9 @@ int main(int argc, char **argv) {
             break;
         case 'M':
             map_len_thres = max(1, atoi(optarg));
+            break;
+        case 'L':
+            long_len_thres = max(map_len_thres, atoi(optarg));
             break;
         case 'v': // verbose mode
             verbose = 1;
@@ -1196,34 +1203,6 @@ int main(int argc, char **argv) {
         cerr << t1 << " ms" << endl;
     }
 
-    // (DEBUG) iterate through all buckets and output corresponding
-    // X/Y out with correpsonding indexes
-    // for (auto it = buckets.begin(); it != buckets.end(); ++it) {
-    //    for (auto xit = (*it)->hashX->hashed.begin();
-    //            xit != (*it)->hashX->hashed.end(); ++xit) {
-    //        sort(xit->second.begin(), xit->second.end());
-    //        // xout first
-    //        cout << xit->first << ":";
-    //        for (int i = 0; i < xit->second.size(); i++) {
-    //            cout << xit->second[i] << ",";
-    //        }
-    //        cout << ";";
-    //    }
-    //    cout << endl;
-    //    for (auto yit = (*it)->hashY->hashed.begin();
-    //            yit != (*it)->hashY->hashed.end(); ++yit) {
-    //        sort(yit->second.begin(), yit->second.end());
-    //        //yout second
-    //        cout << yit->first << ":";
-    //        for (int i = 0; i < yit->second.size(); i++) {
-    //            cout << yit->second[i] << ",";
-    //        }
-    //        cout << ";";
-    //    }
-    //    cout << endl;
-    //}
-    // exit(0);
-
     // (2.a) OPTIONAL: save bucket information to local
     if (save_buckets && !read_buckets) {
         cout << "Save buckets option detected, saving buckets to "
@@ -1238,28 +1217,6 @@ int main(int argc, char **argv) {
     // (3) collect results from all buckets
     int align_thres = int(align_multi * range);
     cerr << "Collecting results (bucket size: " << buckets.size() << ")... ";
-
-    // calculate memory usage from buckets: this could be the "actual"
-    // memory usage if we separate tree construction from assigning
-    // data into the buckets
-    // long bucket_memory = 0;
-    // for (auto it = buckets.cbegin(); it != buckets.cend(); ++it) {
-    //    bucket_memory += sizeof(it->first);
-    //    bucket_memory += sizeof(it->second->x);
-    //    bucket_memory += sizeof(it->second->y);
-    //    bucket_memory += 4 * sizeof(double) + 16;
-    //    for (auto xit = it->second->hashX->hashed.cbegin();
-    //            xit != it->second->hashX->hashed.cend(); ++xit) {
-    //        bucket_memory += xit->second.size() * 4 + 4;
-    //    }
-
-    //    for (auto yit = it->second->hashY->hashed.cbegin();
-    //             yit != it->second->hashY->hashed.cend(); ++yit) {
-    //        bucket_memory += yit->second.size() * 4 + 4;
-    //    }
-    //}
-    // cerr << "Bucket memory: " << bucket_memory << " bytes" << endl;
-    // exit(0);
 
     cstart = Clock::now();
     for (auto it = buckets.begin(); it != buckets.end(); ++it) {
@@ -1281,9 +1238,9 @@ int main(int argc, char **argv) {
                         // 1.30.2023 - since I changed the alignment function
                         // the returned item also include the actual alignment
                         // TESTING OUT its impact on performance
-                        //pair<int, int> val = make_pair(xit->second[i],
+                        // pair<int, int> val = make_pair(xit->second[i],
                         //       yit->second[j]);
-                        //results[cur_xy].push_back(val);
+                        // results[cur_xy].push_back(val);
                         auto ret    = alignment(X[xit->first], Y[yit->first],
                                                 xit->second[i], yit->second[j],
                                                 range, range, false);
