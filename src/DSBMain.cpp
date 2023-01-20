@@ -33,10 +33,14 @@
 #define s_indel -1
 #define s_match 1
 #define s_mismatch -1
+#define s_lalign_match 5
+#define s_lalign_mismatch -4
+#define s_lalign_gap_open -12
+#define s_lalign_gap_ext -2
 
 // evalue constants
-#define e_value_k 0.711
-#define e_value_lambda 0.37
+#define e_value_k 0.11
+#define e_value_lambda 0.232
 //#define e_value_lambda 1.37
 #define e_value_threshold 1e-20
 
@@ -325,8 +329,64 @@ double calc_e_value(int m, int n, int aln_score) {
     return E;
 }
 
-// alignment method for comparing two given data points
-// tuple<int, int, double, vector<char>*, vector<char>*>
+// prefilter alignment when doing a short alignment on the following bases of
+// a mapped region
+int prefilter_alignment(vector<char> &x, vector<char> &y, int xstart,
+                        int ystart, int xrange, int yrange) {
+    int xend      = 0;
+    int yend      = 0;
+    int aln_score = 0;
+    if (xrange != -1 && yrange != -1) {
+        xend = min(xstart + xrange + 1, int(x.size() + 1));
+        yend = min(ystart + yrange + 1, int(y.size() + 1));
+    } else {
+        xend = x.size() + 1;
+        yend = y.size() + 1;
+    }
+    vector<vector<int>> matrix(xend - xstart, vector<int>(yend - ystart, 0));
+
+    // initialize first column/row
+    for (int i = 1; i < xend - xstart; i++)
+        matrix[i][0] = matrix[i - 1][0] + s_indel;
+    for (int j = 1; j < yend - ystart; j++)
+        matrix[0][j] = matrix[0][j - 1] + s_indel;
+
+    // run alignment
+    for (int i = 1; i < xend - xstart; i++) {
+        for (int j = 1; j < yend - ystart; j++) {
+            // diagonal
+            int diag = matrix[i - 1][j - 1];
+            if (x[i - 1 + xstart] == y[j - 1 + ystart])
+                diag += s_match;
+            else
+                diag += s_mismatch;
+
+            // indels
+            int from_left = matrix[i][j - 1] + s_indel;
+            int from_top  = matrix[i - 1][j] + s_indel;
+
+            // check which one is the largest
+            if (diag >= from_left && diag >= from_top)
+                matrix[i][j] = diag;
+            else if (from_top >= from_left)
+                matrix[i][j] = from_top;
+            else
+                matrix[i][j] = from_left;
+        }
+    }
+    aln_score = matrix[xend - xstart - 1][yend - ystart - 1];
+    return aln_score;
+}
+
+// compute gap affinity in an alignment
+int gap_affinity(int length) {
+    if (length > 0)
+        return s_lalign_gap_open + (s_lalign_gap_ext * (length - 1));
+    else
+        return 0;
+}
+
+// alignment method for comparing two given data points over their mapped region
 tuple<int, int, double, double> alignment(vector<char> &x, vector<char> &y,
                                           int xstart, int ystart, int xrange,
                                           int yrange, bool b_backtrace) {
@@ -346,43 +406,44 @@ tuple<int, int, double, double> alignment(vector<char> &x, vector<char> &y,
         yend = y.size() + 1;
     }
     vector<vector<int>> matrix(xend - xstart, vector<int>(yend - ystart, 0));
+    vector<vector<int>> gaplength(xend - xstart, vector<int>(yend - ystart, 0));
 
     // initialize first column/row
     for (int i = 1; i < xend - xstart; i++) {
-        matrix[i][0] = matrix[i - 1][0] + s_indel;
+        matrix[i][0]    = gap_affinity(i);
+        gaplength[i][0] = i;
     }
     for (int j = 1; j < yend - ystart; j++) {
-        matrix[0][j] = matrix[0][j - 1] + s_indel;
+        matrix[0][j]    = gap_affinity(j);
+        gaplength[0][j] = j;
     }
 
     // run alignment
+    int diag = 0, from_left = 0, from_top = 0, length = 0;
     for (int i = 1; i < xend - xstart; i++) {
         for (int j = 1; j < yend - ystart; j++) {
             // diagonal
-            int diag = matrix[i - 1][j - 1];
+            diag = matrix[i - 1][j - 1];
             if (x[i - 1 + xstart] == y[j - 1 + ystart])
-                diag += s_match;
+                diag += s_lalign_match;
             else
-                diag += s_mismatch;
+                diag += s_lalign_mismatch;
 
             // indels
-            int from_left = matrix[i][j - 1] + s_indel;
-            int from_top  = matrix[i - 1][j] + s_indel;
+            from_top = matrix[i - 1][j] + gap_affinity(gaplength[i - 1][j] + 1);
+            from_left =
+                matrix[i][j - 1] + gap_affinity(gaplength[i][j - 1] + 1);
 
             // check which one is the largest
-            if (diag > from_left && diag > from_top)
-                matrix[i][j] = diag;
-            else if (from_left > diag && from_left > from_top)
-                matrix[i][j] = from_left;
-            else if (from_top > diag && from_top > from_left)
-                matrix[i][j] = from_top;
-            else {
-                if (diag == from_left)
-                    matrix[i][j] = diag;
-                else if (diag == from_top)
-                    matrix[i][j] = diag;
-                else
-                    matrix[i][j] = from_top;
+            if (diag >= from_left && diag >= from_top) {
+                matrix[i][j]    = diag;
+                gaplength[i][j] = 0;
+            } else if (from_top >= from_left) {
+                matrix[i][j]    = from_top;
+                gaplength[i][j] = gaplength[i - 1][j] + 1;
+            } else {
+                matrix[i][j]    = from_left;
+                gaplength[i][j] = gaplength[i][j - 1] + 1;
             }
         }
     }
@@ -413,20 +474,22 @@ tuple<int, int, double, double> alignment(vector<char> &x, vector<char> &y,
                 j--;
             }
             // diagonal - mismatch
-            else if (matrix[i][j] == matrix[i - 1][j - 1] + s_mismatch) {
+            else if (matrix[i][j] == matrix[i - 1][j - 1] + s_lalign_mismatch) {
                 tmp_x[xpos--] = x[xstart + i - 1];
                 tmp_y[ypos--] = y[ystart + j - 1];
                 i--;
                 j--;
             }
             // from top
-            else if (matrix[i][j] == matrix[i - 1][j] + s_indel) {
+            else if (matrix[i][j] ==
+                     matrix[i - 1][j] + gap_affinity(gaplength[i - 1][j] + 1)) {
                 tmp_x[xpos--] = x[xstart + i - 1];
                 tmp_y[ypos--] = '-';
                 i--;
             }
             // from left
-            else if (matrix[i][j] == matrix[i][j - 1] + s_indel) {
+            else if (matrix[i][j] ==
+                     matrix[i][j - 1] + gap_affinity(gaplength[i][j - 1] + 1)) {
                 tmp_x[xpos--] = '-';
                 tmp_y[ypos--] = y[ystart + j - 1];
                 j--;
@@ -484,7 +547,8 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
     int l_kmer        = 6; // 6-mer
 
     // failsafe for wrong sizes
-    if ((xend - xstart) <= 0 || (yend - ystart) <= 0) return pct_shared;
+    if ((xend - xstart) <= 0 || (yend - ystart) <= 0)
+        return pct_shared;
 
     // iterate over x on its respective range
     for (int i = xstart; i < xend - l_kmer + 1; i++) {
@@ -512,8 +576,8 @@ double pct_shared_kmers(vector<char> &x, vector<char> &y, int xstart, int xend,
  *  >= some threshold such as 60%)
  */
 bool filter_and_write(ofstream &reports, bool b_alignment, double threshold,
-                  int q, int t, int q_start, int q_end, int t_start,
-                  int t_end) {
+                      int q, int t, int q_start, int q_end, int t_start,
+                      int t_end) {
     // q and t are 1-based, NEED TO SUBTRACT BY 1
     double metric = 0.0, e_value = 0.0;
     int aln_score = 0;
@@ -526,7 +590,7 @@ bool filter_and_write(ofstream &reports, bool b_alignment, double threshold,
                               q_end - q_start, t_end - t_start, true);
         aln_score = get<0>(ret);
         start_idx = get<1>(ret);
-        metric  = get<2>(ret); // alignment identity
+        metric    = get<2>(ret); // alignment identity
         e_value   = get<3>(ret); // alignment e-value
     } else {
         // compute shared pct shared kmers
@@ -1272,10 +1336,10 @@ int main(int argc, char **argv) {
                         // pair<int, int> val = make_pair(xit->second[i],
                         //       yit->second[j]);
                         // results[cur_xy].push_back(val);
-                        auto ret    = alignment(X[xit->first], Y[yit->first],
-                                                xit->second[i], yit->second[j],
-                                                range, range, false);
-                        align_score = get<0>(ret);
+                        align_score = prefilter_alignment(
+                            X[xit->first], Y[yit->first], xit->second[i],
+                            yit->second[j], range, range);
+                        // align_score = get<0>(ret);
 
                         // if alignment score is good, then end the loop
                         if (align_score >= align_thres) {
@@ -1386,8 +1450,9 @@ int main(int argc, char **argv) {
                     ++entry;
                 }
             }
+
             // now, add the connected map if it has length exceeds X bp
-            if (((t_end - t_start) >= map_len_thres) && 
+            if (((t_end - t_start) >= map_len_thres) &&
                 ((q_end - q_start) >= map_len_thres)) {
                 // if long mapping (e.g., > 1000 bp), do shared kmer filtering
                 if ((t_end - t_start >= long_len_thres) ||
@@ -1400,9 +1465,8 @@ int main(int argc, char **argv) {
                         num_passed_kmers++;
                 } else {
                     // use e-value for filtering alignment
-                    passed =
-                        filter_and_write(reports, true, id_threshold, x, y,
-                                         q_start, q_end, t_start, t_end);
+                    passed = filter_and_write(reports, true, id_threshold, x, y,
+                                              q_start, q_end, t_start, t_end);
                     num_checked++;
                     if (passed)
                         num_passed_filter++;
