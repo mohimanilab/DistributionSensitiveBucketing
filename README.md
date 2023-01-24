@@ -61,12 +61,6 @@ query index, target index, query map start, query map end, target map start, tar
 ```
 The expected output file from this example is included in the **output/example_1_output.txt** directory.
 
-#### _Example 1.2_
-To search reads against reads, we use the following command:
-```bash
-./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
-```
-
 ### **DataGeneration**
 ```bash
 ./DataGeneration -i [insertion rate] -d [deletion rate] -m [mutation rate] -n [number of sequences] -s [initial length of a sequence] -p [path] -vh
