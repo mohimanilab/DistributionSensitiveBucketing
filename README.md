@@ -59,7 +59,7 @@ Without specifying the output name, the program will print the results to a defa
 ```
 query index, target index, query map start, query map end, target map start, target map end, identity (alignment or shared kmer), e-value (if alignment), filter type
 ```
-The expected output file from this example is included in the **output/** directory.
+The expected output file from this example is included in the **output/example_1_output.txt** directory.
 
 #### _Example 1.2_
 To search reads against reads, we use the following command:
