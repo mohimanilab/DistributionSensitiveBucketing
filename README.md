@@ -24,34 +24,45 @@ Currently, we use a python script to process the raw output files from our progr
 ## How To Run
 ### **DSBMain**
 ```bash
-./DSBMain -q [query file] -r [reference file] -i [insertion rate] -d [deletion rate] -m [mutation rate] -a [add threshold] -k [kill threshold] -o [name] {-vh}
+./DSBMain -q [query file] -r [reference file] -i [insertion rate] -d [deletion rate] -m [mutation rate] \
+          -a [add threshold] -k [kill threshold] -o [name] -A [alignment threshold] -K [kmer threshold] \
+          -M [min map length] -L [kmer filter threshold] {-vh}
 
 -h              Print this block of information.
 -v              Verbose mode.
--q [path/to/q]  Path to the query file.
--r [path/to/r]  Path to the reference file.
 -i [0<=i<1]     Insertion rate.
 -d [0<=d<1]     Deletion rate.
 -m [0<=e<0.5]   Mutation rate when neither insertion/deletion happens.
 -a [a>0]        Threshold for a node to be considered a bucket.
 -k [k>0]        Threshold for a node to be pruned.
+-A [0<=A<=1]    Threshold for filtering maps with global alignment (default: 0.7).
+-K [0<=K<=1]    Threshold for filtering maps with percentage shared kmers (default: 0.25).
+-M [M>0]        Minimum reported map length (default: 250bp).
+-L [L>M]        Lower bound map length to start using shared kmer for filtering (default: 1000bp).
+-b [path]       If specified, DSB will use the given buckets file produced from a previously curated run.
+-s [path]       If specified, DSB will save the buckets from this run to [path] and terminate early.
+
+Other setttings:
+-v              Verbose mode.
 -o [name]       Specify output file name.
+-q [path/to/q]  Path to the query file.
+-r [path/to/r]  Path to the reference file.
 ```
 To view the full helper message with command line, please use `./DSBMain -h`.
 
 #### _Example 1_
-Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data (this task should take ~10 minutes to run):
+Starting with query **data/pacbio_reads_5000.fasta** and reference **data/ecoli_genome_full.fasta**, we use **12\% insertion rate, 2\% deletion rate, and 1\% mutation rate** for the PacBio sequencing data:
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/ecoli_genome_full.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
-Without specifying the output name, the program will print the results to a default file named **output.txt**. To process the output file for better readability, run the python script:
-```bash
-python mapResults.py -i output.txt
+Without specifying the output name, the program will print the results to a default file named **output.txt**, in which each line represents a mapped region. Columns are:
 ```
-This will produce a file named **output_mapped.txt**, in which each line represents an overlap region. The expected output file from this example is included in the **output/** directory.
+query index, target index, query map start, query map end, target map start, target map end, identity (alignment or shared kmer), e-value (if alignment), filter type
+```
+The expected output file from this example is included in the **output/** directory.
 
 #### _Example 1.2_
-To search reads against reads, we use the following command (this task should take ~25 minutes to run):
+To search reads against reads, we use the following command:
 ```bash
 ./DSBMain -q data/pacbio_reads_5000.fasta -r data/pacbio_reads_5000.fasta -i 0.12 -d 0.02 -m 0.01 -a 25000 -k 250000000
 ```
